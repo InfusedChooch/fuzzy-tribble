@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ station_name }} Check-In</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/school_logo.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <h1>{{ station_name }} Station</h1>
+
+  <form id="station-form">
+    <label for="student_id">Enter Student ID:</label>
+    <input type="text" id="student_id" name="student_id" required>
+    <button type="submit">Log Visit</button>
+  </form>
+
+  <p class="message" id="station-msg"></p>
+
+  <script>
+    document.getElementById('station-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+
+      fetch("/station_log", {
+        method: "POST",
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("station-msg").textContent = data.message;
+        this.reset();
+      });
+    });
+  </script>
+</body>
+</html>

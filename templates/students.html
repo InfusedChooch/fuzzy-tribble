@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Students</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/school_logo.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Student Roster</h1>
+    <nav>
+      <a href="{{ url_for('admin.admin_view') }}">← Back to Admin Panel</a>
+    </nav>
+  </header>
+
+  <section>
+    <table class="roster-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Period</th>
+          <th>Course</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in students %}
+        <tr>
+          <td>{{ s.id }}</td>
+          <td>{{ s.name }}</td>
+          <td>{{ s.period }}</td>
+          <td>{{ s.course }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <p><a href="{{ url_for('students.download_students_csv') }}">Download CSV</a></p>
+    <a href="{{ url_for('static', filename='student_upload_template.csv') }}">Download Template</a>
+
+    <form action="{{ url_for('students.upload_students_csv') }}" method="POST" enctype="multipart/form-data">
+      <label for="csv_file">Upload new student list (CSV):</label><br><br>
+      <input type="file" name="csv_file" accept=".csv" required>
+      <button type="submit">Upload</button>
+    </form>
+  </section>
+
+  <section>
+  <h3>Add Individual Student</h3>
+  <form action="{{ url_for('students.add_student') }}" method="POST">
+    <input type="text" name="id" placeholder="Student ID" required>
+    <input type="text" name="name" placeholder="Full Name" required>
+    <input type="text" name="period" placeholder="Period (e.g. 3)" required>
+    <input type="text" name="course" placeholder="Course (e.g. Math)" required>
+    <button type="submit">Add Student</button>
+  </form>
+</section>
+
+</body>
+</html>

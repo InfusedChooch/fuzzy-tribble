@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Select Station</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <h2>Configure This Station</h2>
+  <form method="POST">
+    <label>Select a Station:</label>
+    <select name="station" required>
+      {% for s in stations %}
+        <option value="{{ s }}">{{ s }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Set Station</button>
+  </form>
+</body>
+</html>

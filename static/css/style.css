@@ -1,0 +1,125 @@
+/* style.css */
+
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 20px;
+  background: #f9f9f9;
+  color: #333;
+  text-align: center;
+}
+
+h1, h2 {
+  margin-top: 10px;
+  color: #2a2a2a;
+}
+
+a {
+  color: #2a5bd7;
+  text-decoration: none;
+  margin: 0 10px;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+nav {
+  margin-bottom: 20px;
+}
+
+button {
+  padding: 10px 20px;
+  font-size: 1em;
+  border: none;
+  background-color: #4a90e2;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #357ab8;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="file"] {
+  padding: 8px;
+  margin: 5px 0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1em;
+}
+
+form {
+  margin: 20px 0;
+}
+
+.error {
+  color: red;
+  font-weight: bold;
+}
+
+table {
+  margin: auto;
+  border-collapse: collapse;
+  width: 90%;
+  background: #fff;
+}
+
+th, td {
+  border: 1px solid #ccc;
+  padding: 10px;
+  text-align: center;
+}
+
+th {
+  background: #e4e4e4;
+}
+
+.occupied {
+  background-color: #f7d4d4;
+}
+
+.free {
+  background-color: #d4f5d4;
+}
+
+.pass-box {
+  width: 160px;
+  height: 160px;
+  border: 3px solid #333;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.2em;
+  position: relative;
+  margin: 10px;
+}
+
+.symbol {
+  font-size: 3em;
+}
+
+.clock {
+  font-size: 2em;
+  margin-top: 20px;
+}
+
+.message {
+  font-weight: bold;
+  margin: 10px 0;
+}
+
+.passes {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;         /* Allows wrapping to new lines if needed */
+  gap: 20px;               /* Optional: spacing between boxes */
+  margin: 30px auto;
+  max-width: 900px;        /* Optional: limits how wide it stretches */
+}
+

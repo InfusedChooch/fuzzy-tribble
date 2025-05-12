@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/school_logo.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>Hall Pass Tracker</title>
+</head>
+<body>
+    <h1>{{ school_name }}</h1>
+    <h2>Period #{{ current_period if current_period is not none else 'N/A' }} Hall Pass</h2>
+
+    <div class="passes" id="pass-container"></div>
+
+    <form id="check-form">
+        <label for="student_id">Type your Student ID #</label>
+        <input type="text" id="student_id" name="student_id" required>
+        <button type="submit">ENTER</button>
+    </form>
+
+    <p class="message" id="message"></p>
+    <div class="clock" id="clock">Loading time...</div>
+
+    <script src="{{ url_for('static', filename='js/index.js') }}"></script>
+</body>
+</html>

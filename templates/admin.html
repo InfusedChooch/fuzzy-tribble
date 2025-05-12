@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - Hall Pass Tracker</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/school_logo.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Admin Panel</h1>
+    <nav>
+      <a href="{{ url_for('auth.admin_logout') }}">Logout</a> |
+      <a href="{{ url_for('report.admin_report') }}">View Weekly Report</a> |
+      <a href="{{ url_for('students.manage_students') }}">Manage Students</a> |
+      <a href="#" onclick="manualRefresh()">Refresh All</a>
+    </nav>
+  </header>
+
+  <section>
+    <h2>Create Admin Pass (Override)</h2>
+    <form id="create-pass-form">
+      <label for="student_id">Student ID:</label>
+      <input type="text" id="student_id" name="student_id" required>
+      <button type="submit">Create Override Pass</button>
+    </form>
+    <p id="admin-pass-msg"></p>
+  </section>
+
+  <section>
+    <h2>Active Passes (All)</h2>
+    <table id="passes-table" class="admin-table">
+      <thead>
+        <tr>
+          <th>Pass ID</th>
+          <th>Student ID</th>
+          <th>Name</th>
+          <th>Time Out</th>
+          <th>Elapsed</th>
+          <th>Note</th>
+          <th>Override</th>
+          <th>Stations</th> <!-- 🆕 -->
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Change Admin Password</h2>
+    <form id="change-password-form">
+      <label>Current Password:</label>
+      <input type="password" id="current_pass">
+      <label>New Password:</label>
+      <input type="password" id="new_pass">
+      <label>Confirm New Password:</label>
+      <input type="password" id="confirm_pass">
+      <button type="submit">Change Password</button>
+    </form>
+    <p id="password-msg"></p>
+  </section>
+
+  <section>
+    <h2>Recent Pass History</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Date</th>
+          <th>Period</th>
+          <th>Time Out</th>
+          <th>Time In</th>
+          <th>Duration</th>
+          <th>Override</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in recent_passes %}
+        <tr>
+          <td>{{ p.student.name if p.student else 'Unknown' }}</td>
+          <td>{{ p.date }}</td>
+          <td>{{ p.period }}</td>
+          <td>{{ p.checkout_time.strftime('%H:%M:%S') if p.checkout_time else '' }}</td>
+          <td>{{ p.checkin_time.strftime('%H:%M:%S') if p.checkin_time else '' }}</td>
+          <td>
+            {% if p.total_pass_time %}
+              {{ p.total_pass_time // 60 }}m {{ p.total_pass_time % 60 }}s
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>{{ '✔️' if p.is_override else '' }}</td>
+          <td>{{ p.note or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+</html>
