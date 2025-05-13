@@ -8,39 +8,36 @@
   <h1>Checked-In Passes</h1>
   <a href="{{ url_for('admin.admin_view') }}">← Back to Admin Panel</a>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Student</th>
-        <th>Date</th>
-        <th>Period</th>
-        <th>Time Out</th>
-        <th>Time In</th>
-        <th>Duration</th>
-        <th>Override</th>
-        <th>Note</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for p in history %}
-      <tr>
-        <td>{{ p.student.name if p.student else 'Unknown' }}</td>
-        <td>{{ p.date }}</td>
-        <td>{{ p.period }}</td>
-        <td>{{ p.checkout_time.strftime('%H:%M:%S') if p.checkout_time else '' }}</td>
-        <td>{{ p.checkin_time.strftime('%H:%M:%S') if p.checkin_time else '' }}</td>
-        <td>
-          {% if p.total_pass_time %}
-            {{ p.total_pass_time // 60 }}m {{ p.total_pass_time % 60 }}s
-          {% else %}
-            —
-          {% endif %}
-        </td>
-        <td>{{ '✔️' if p.is_override else '' }}</td>
-        <td>{{ p.note or '' }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<table>
+  <thead>
+    <tr>
+      <th>Student</th>
+      <th>Date</th>
+      <th>Period</th>
+      <th>Room Out</th>
+      <th>Station In</th>
+      <th>Station Out</th>
+      <th>Room In</th>
+      <th>Duration</th>
+      <th>Notes + Override</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.student }}</td>
+      <td>{{ row.date }}</td>
+      <td>{{ row.period }}</td>
+      <td>{{ row.room_out }}</td>
+      <td>{{ row.station_in }}</td>
+      <td>{{ row.station_out }}</td>
+      <td>{{ row.room_in }}</td>
+      <td>{{ row.duration }}</td>
+      <td>{{ row.note }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
 </body>
 </html>

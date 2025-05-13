@@ -1,0 +1,22 @@
+<!-- templates/admin_station_setup.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin — Set Station Label</title>
+  <style>
+    body { font-family:sans-serif; text-align:center; padding:2em; }
+    input, select { padding:0.6em 1em; margin:0.5em; }
+    button { padding:0.6em 1.2em; }
+  </style>
+</head>
+<body>
+  <h1>Select the room this admin console represents</h1>
+  <form method="POST">
+    <!-- free‑text so admins can type anything -->
+    <input type="text" name="station" placeholder="e.g. 107 or Library" required />
+    <button type="submit">Save &amp; Continue</button>
+  </form>
+  <p>You can change this later from the Admin panel.</p>
+</body>
+</html>

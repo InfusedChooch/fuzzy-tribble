@@ -1,43 +1,45 @@
+<!-- templates/admin_report.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Weekly Report</title>
-  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/school_logo.png') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <meta charset="UTF-8" />
+  <title>Weekly Hall‑Pass Report</title>
+  <style>
+    body { font-family:sans-serif; padding:2em; }
+    table { width:100%; border-collapse:collapse; margin-top:2em; }
+    th,td { border:1px solid #ccc; padding:0.4em 0.6em; text-align:center; }
+  </style>
 </head>
 <body>
-  <header>
-    <h1>Weekly Pass Report</h1>
-    <button onclick="window.location.href='{{ url_for('report.admin_report_csv') }}'">Download CSV</button>
-  </header>
+  <h1>Weekly Hall‑Pass Summary</h1>
+  <nav>
+    <a href="{{ url_for('admin.admin_view') }}">← Back to Admin</a> |
+    <a href="{{ url_for('report.admin_report_csv') }}">Download CSV</a>
+  </nav>
 
-  <section>
-    <table class="report-table">
-      <thead>
-        <tr>
-          <th>Student Name</th>
-          <th>Student ID</th>
-          <th>Weekly Report (Day:Min)</th>
-          <th>Passes Over 5 Min</th>
-          <th>Passes Over 10 Min</th>
-          <th>Used Override</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in report_data %}
-        <tr>
-          <td>{{ row.student_name }}</td>
-          <td>{{ row.student_id }}</td>
-          <td>{{ row.weekly_report }}</td>
-          <td>{{ row.passes_over_5_min }}</td>
-          <td>{{ row.passes_over_10_min }}</td>
-          <td>{{ row.used_override }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </section>
+  <table>
+    <thead>
+      <tr>
+        <th>Student Name</th>
+        <th>ID</th>
+        <th>Weekly Totals&nbsp;(min)</th>
+        <th>#&nbsp;>5&nbsp;min</th>
+        <th>#&nbsp;>10&nbsp;min</th>
+        <th>Override Used</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in report_data %}
+      <tr>
+        <td>{{ row.student_name }}</td>
+        <td>{{ row.student_id }}</td>
+        <td>{{ row.weekly_report }}</td>
+        <td>{{ row.passes_over_5_min }}</td>
+        <td>{{ row.passes_over_10_min }}</td>
+        <td>{{ row.used_override }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </body>
 </html>

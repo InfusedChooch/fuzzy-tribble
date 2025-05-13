@@ -1,27 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/school_logo.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <title>Hall Pass Tracker</title>
+  <meta charset="UTF-8">
+  <title>{{ school_name }} — Room {{ room }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .pass-box {
+      border: 2px solid black;
+      padding: 1em;
+      margin: 1em;
+      display: inline-block;
+      width: 180px;
+      height: 100px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .pending_start  { background-color: #cfe2ff; }
+    .active         { background-color: #ffd6d6; }
+    .pending_return { background-color: #ffedc7; }
+    .free           { background-color: #dfffdf; }
+  </style>
 </head>
 <body>
-    <h1>{{ school_name }}</h1>
-    <h2>Period #{{ current_period if current_period is not none else 'N/A' }} Hall Pass</h2>
+  <h1>{{ school_name }} — Room {{ room }}</h1>
+  <h2>Period: {{ current_period }}</h2>
 
-    <div class="passes" id="pass-container"></div>
+  <div id="pass-grid">
+    {% for p in passes %}
+    <div class="pass-box {{ p.status }}">
+      <strong>{{ p.student_name or "Available" }}</strong><br>
+      Status: {{ p.status }}
+    </div>
+    {% endfor %}
+  </div>
 
-    <form id="check-form">
-        <label for="student_id">Type your Student ID #</label>
-        <input type="text" id="student_id" name="student_id" required>
-        <button type="submit">ENTER</button>
-    </form>
+  <hr>
 
-    <p class="message" id="message"></p>
-    <div class="clock" id="clock">Loading time...</div>
+  <form id="request-form" method="POST">
+    <input type="text" name="student_id" placeholder="Enter your Student ID" required>
+    <button type="submit">Request Pass</button>
+  </form>
 
-    <script src="{{ url_for('static', filename='js/index.js') }}"></script>
+  {% if message %}
+  <p style="color: green;">{{ message }}</p>
+  {% endif %}
 </body>
 </html>

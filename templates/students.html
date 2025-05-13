@@ -21,8 +21,7 @@
         <tr>
           <th>ID</th>
           <th>Name</th>
-          <th>Period</th>
-          <th>Course</th>
+          <th>Schedule (JSON)</th>
         </tr>
       </thead>
       <tbody>
@@ -30,8 +29,7 @@
         <tr>
           <td>{{ s.id }}</td>
           <td>{{ s.name }}</td>
-          <td>{{ s.period }}</td>
-          <td>{{ s.course }}</td>
+          <td>{{ s.schedule | tojson }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -50,15 +48,13 @@
   </section>
 
   <section>
-  <h3>Add Individual Student</h3>
-  <form action="{{ url_for('students.add_student') }}" method="POST">
-    <input type="text" name="id" placeholder="Student ID" required>
-    <input type="text" name="name" placeholder="Full Name" required>
-    <input type="text" name="period" placeholder="Period (e.g. 3)" required>
-    <input type="text" name="course" placeholder="Course (e.g. Math)" required>
-    <button type="submit">Add Student</button>
-  </form>
-</section>
-
+    <h3>Add Individual Student</h3>
+    <form action="{{ url_for('students.add_student') }}" method="POST">
+      <input type="text" name="id" placeholder="Student ID" required>
+      <input type="text" name="name" placeholder="Full Name" required>
+      <input type="text" name="schedule" placeholder='Schedule (e.g. {"1": "101", "2": "102"})' required>
+      <button type="submit">Add Student</button>
+    </form>
+  </section>
 </body>
 </html>

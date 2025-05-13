@@ -1,37 +1,46 @@
+<!-- templates/station.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>{{ station_name }} Check-In</title>
-  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/school_logo.png') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <meta charset="UTF-8" />
+  <title>Station Kiosk — {{ station }}</title>
+  <style>
+    body { font-family:sans-serif; text-align:center; padding:2em; }
+    form { margin:2em auto; }
+    input { padding:0.6em 1em; width:220px; }
+    button { padding:0.6em 1.2em; }
+    .message { color:red; margin:1em; font-weight:bold; }
+    table { margin:2em auto; border-collapse:collapse; width:60%; }
+    th,td { border:1px solid #ccc; padding:0.4em 0.6em; }
+    .active  { background:#ffd6d6; }
+    .pending { background:#ffedc7; }
+  </style>
 </head>
 <body>
-  <h1>{{ station_name }} Station</h1>
+  <h1>{{ station }} Station</h1>
+  <p>Please scan / enter your ID to log IN or OUT.</p>
 
-  <form id="station-form">
-    <label for="student_id">Enter Student ID:</label>
-    <input type="text" id="student_id" name="student_id" required>
-    <button type="submit">Log Visit</button>
+  {% if message %}<div class="message">{{ message }}</div>{% endif %}
+
+  <form method="POST">
+    <input type="text" name="student_id" placeholder="Student ID" autofocus required />
+    <button type="submit">Submit</button>
   </form>
 
-  <p class="message" id="station-msg"></p>
-
-  <script>
-    document.getElementById('station-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const formData = new FormData(this);
-
-      fetch("/station_log", {
-        method: "POST",
-        body: formData
-      })
-      .then(res => res.json())
-      .then(data => {
-        document.getElementById("station-msg").textContent = data.message;
-        this.reset();
-      });
-    });
-  </script>
+  <h2>Passes involving this station</h2>
+  <table>
+    <thead>
+      <tr><th>Student</th><th>Status</th><th>Origin Room</th></tr>
+    </thead>
+    <tbody>
+      {% for p in passes %}
+      <tr class="{{ p.status }}">
+        <td>{{ p.student_name }}</td>
+        <td>{{ p.status }}</td>
+        <td>{{ p.room }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </body>
 </html>

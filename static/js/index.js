@@ -17,11 +17,20 @@ function refreshPasses() {
       container.innerHTML = '';
       slots.forEach((slot, i) => {
         const box = document.createElement('div');
-        box.className = `pass-box ${slot.status === 'free' ? 'free' : 'occupied'}`;
+        box.className = `pass-box ${slot.status}`;
+        const symbol = slot.status === 'free' ? 'O'
+                      : slot.status === 'pending' ? '■'
+                      : '✕';
+
+        const text = slot.status === 'free' ? 'Free'
+                    : slot.status === 'pending' ? 'Pending'
+                    : 'OUT @ ' + slot.time_out;
+
         box.innerHTML = `
-          <div class="symbol">${slot.status === 'free' ? 'O' : 'X'}</div>
-          <div class="status-text">${slot.status === 'free' ? 'Free' : 'OUT @ ' + slot.time_out}</div>
+          <div class="symbol">${symbol}</div>
+          <div class="status-text">${text}</div>
           <div class="id-label">Pass ${i + 1}</div>
+          <div class="room-label">${slot.station ? 'Room ' + slot.station : ''}</div>
         `;
         container.appendChild(box);
       });
@@ -31,7 +40,7 @@ function refreshPasses() {
 document.getElementById('check-form').addEventListener('submit', function(e) {
   e.preventDefault();
   const formData = new FormData(this);
-  fetch('/check', {
+  fetch('/request_pass', {
     method: 'POST',
     body: formData
   })

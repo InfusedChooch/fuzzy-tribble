@@ -123,3 +123,9 @@ th {
   max-width: 900px;        /* Optional: limits how wide it stretches */
 }
 
+.pass-box.occupied { background-color: #ffd6d6; }
+.pass-box.pending  { background-color: #cfe2ff; }
+.pass-box.free     { background-color: #dfffdf; }
+
+/* style.css */
+.pending-row tr { background:#cfe2ff; }
