@@ -6,107 +6,95 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
     table { width: 100%; margin-bottom: 2em; border-collapse: collapse; }
-    th, td { padding: 0.5em; border: 1px solid #ccc; text-align: center; }
-    .pending_start { background-color: #cfe2ff; }
-    .active         { background-color: #ffd6d6; }
-    .pending_return { background-color: #ffedc7; }
+    th, td { padding: .5em; border: 1px solid #ccc; text-align: center; }
+    .pending_start { background: #cfe2ff; }
+    .pending_return { background: #ffedc7; }
+    .active { background: #ffd6d6; }
   </style>
 </head>
 <body>
   <h1>Admin Panel — Station: {{ admin_station }}</h1>
+
   <nav>
     <a href="{{ url_for('auth.admin_logout') }}">Logout</a> |
-    <a href="{{ url_for('admin.admin_pass_history') }}">Pass History</a>
+    <a href="{{ url_for('admin.set_station') }}">Set This Console as Station</a> |
+    <a href="{{ url_for('admin.admin_pass_history') }}">Pass History</a> |
+    <a href="{{ url_for('report.admin_report_csv') }}">Download Weekly&nbsp;CSV</a>
   </nav>
 
-  <h2>Pending Start Requests</h2>
+  <h3>Pop Out Station View</h3>
+  <form id="station-popout-form" onsubmit="openStationView(event)">
+    <select id="station-selector">
+      {% for room in station_rooms %}
+        <option value="{{ room }}">{{ room }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Open Station Window</button>
+  </form>
+
+  <!-- ------------------------------------------------------------ -->
+  <h2>Create Override Pass</h2>
+  <form id="create-pass-form">
+    <input type="text" id="student_id" placeholder="Student ID" required>
+    <button type="submit">Create Override</button>
+  </form>
+
+  <!-- ------------------------------------------------------------ -->
+  <h2>Live Pass Table</h2>
   <table>
     <thead>
       <tr>
-        <th>Pass ID</th>
-        <th>Student</th>
-        <th>Room</th>
-        <th>Time Out</th>
-        <th>Note</th>
-        <th>Override</th>
-        <th>Action</th>
+        <th>ID</th><th>Student</th><th>Room</th><th>Out</th>
+        <th>Station&nbsp;OUT</th><th>Station&nbsp;IN</th><th>Last</th>
+        <th>Time</th><th>Note</th><th>Override</th><th>Action</th>
       </tr>
     </thead>
-    <tbody>
-      {% for p in pending_starts %}
-      <tr class="pending_start">
-        <td>{{ p.id }}</td>
-        <td>{{ p.name }}</td>
-        <td>{{ p.station }}</td>
-        <td>{{ p.time_out }}</td>
-        <td>{{ p.note }}</td>
-        <td>{{ p.override }}</td>
-        <td>
-          <form method="POST" action="{{ url_for('admin.admin_approve_pass', pass_id=p.id) }}">
-            <button>Approve</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
+    <tbody id="passes-table">
+      <!-- Filled by admin.js -->
     </tbody>
   </table>
 
-  <h2>Active Passes</h2>
+  <!-- ------------------------------------------------------------ -->
+  <h2>Weekly Summary (Mon‑Fri)</h2>
   <table>
     <thead>
       <tr>
-        <th>Pass ID</th>
-        <th>Student</th>
-        <th>Room</th>
-        <th>Time Out</th>
-        <th>Note</th>
-        <th>Override</th>
+        <th>Student</th><th>ID</th><th>M&nbsp;T&nbsp;W&nbsp;T&nbsp;F&nbsp;(min)</th>
+        <th>#&nbsp;>5&nbsp;min</th><th>#&nbsp;>10&nbsp;min</th><th>Override?</th>
       </tr>
     </thead>
     <tbody>
-      {% for p in active %}
-      <tr class="active">
-        <td>{{ p.id }}</td>
-        <td>{{ p.name }}</td>
-        <td>{{ p.station }}</td>
-        <td>{{ p.time_out }}</td>
-        <td>{{ p.note }}</td>
-        <td>{{ p.override }}</td>
+    {% for row in report_data %}
+      <tr>
+        <td>{{ row.student_name }}</td>
+        <td>{{ row.student_id }}</td>
+        <td>{{ row.weekly_report }}</td>
+        <td>{{ row.passes_over_5_min }}</td>
+        <td>{{ row.passes_over_10_min }}</td>
+        <td>{{ row.used_override }}</td>
       </tr>
-      {% endfor %}
+    {% endfor %}
     </tbody>
   </table>
 
-  <h2>Pending Return Requests</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Pass ID</th>
-        <th>Student</th>
-        <th>Room</th>
-        <th>Time Out</th>
-        <th>Note</th>
-        <th>Override</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for p in pending_returns %}
-      <tr class="pending_return">
-        <td>{{ p.id }}</td>
-        <td>{{ p.name }}</td>
-        <td>{{ p.station }}</td>
-        <td>{{ p.time_out }}</td>
-        <td>{{ p.note }}</td>
-        <td>{{ p.override }}</td>
-        <td>
-          <form method="POST" action="{{ url_for('admin.admin_checkin', pass_id=p.id) }}">
-            <button>End Pass</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <!-- ------------------------------------------------------------ -->
+  <h2>Change Admin Password</h2>
+  <form id="change-password-form">
+    <input type="password" id="current_pass" placeholder="Current Password" required>
+    <input type="password" id="new_pass" placeholder="New Password" required>
+    <input type="password" id="confirm_pass" placeholder="Confirm New Password" required>
+    <button type="submit">Change Password</button>
+    <p id="password-msg"></p>
+  </form>
+
+  <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+  <script>
+    function openStationView(event) {
+      event.preventDefault();
+      const station = document.getElementById('station-selector').value;
+      const url = `/station_view/${station}`;
+      window.open(url, '_blank', 'width=800,height=600');
+    }
+  </script>
 </body>
 </html>

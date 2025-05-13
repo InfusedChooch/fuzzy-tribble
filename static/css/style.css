@@ -78,14 +78,6 @@ th {
   background: #e4e4e4;
 }
 
-.occupied {
-  background-color: #f7d4d4;
-}
-
-.free {
-  background-color: #d4f5d4;
-}
-
 .pass-box {
   width: 160px;
   height: 160px;
@@ -100,8 +92,29 @@ th {
   margin: 10px;
 }
 
+.pass-box.free           { background-color: #dfffdf; }  /* Green */
+.pass-box.pending_start  { background-color: #cfe2ff; }  /* Blue */
+.pass-box.pending_return { background-color: #ffedc7; }  /* Orange */
+.pass-box.active         { background-color: #ffd6d6; }  /* Red */
+
 .symbol {
-  font-size: 3em;
+  font-size: 2.2em;
+  margin-bottom: 0.2em;
+}
+
+.status-text {
+  font-weight: bold;
+  font-size: 1em;
+  margin-bottom: 0.4em;
+}
+
+.passes {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin: 30px auto;
+  max-width: 900px;
 }
 
 .clock {
@@ -114,18 +127,6 @@ th {
   margin: 10px 0;
 }
 
-.passes {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;         /* Allows wrapping to new lines if needed */
-  gap: 20px;               /* Optional: spacing between boxes */
-  margin: 30px auto;
-  max-width: 900px;        /* Optional: limits how wide it stretches */
+.pending-row tr {
+  background: #cfe2ff;
 }
-
-.pass-box.occupied { background-color: #ffd6d6; }
-.pass-box.pending  { background-color: #cfe2ff; }
-.pass-box.free     { background-color: #dfffdf; }
-
-/* style.css */
-.pending-row tr { background:#cfe2ff; }

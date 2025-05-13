@@ -18,26 +18,27 @@ function refreshPasses() {
       slots.forEach((slot, i) => {
         const box = document.createElement('div');
         box.className = `pass-box ${slot.status}`;
-        const symbol = slot.status === 'free' ? 'O'
-                      : slot.status === 'pending' ? '■'
-                      : '✕';
 
-        const text = slot.status === 'free' ? 'Free'
-                    : slot.status === 'pending' ? 'Pending'
-                    : 'OUT @ ' + slot.time_out;
+        const symbol = slot.status === 'free' ? '🟢 O'
+                      : slot.status === 'pending_start' ? '🔵 ■'
+                      : '🔴 ✕';
+
+        const text = slot.status === 'free' ? 'Open'
+                    : slot.status === 'pending_start' ? 'Pending'
+                    : `${slot.student_name}`;
 
         box.innerHTML = `
           <div class="symbol">${symbol}</div>
           <div class="status-text">${text}</div>
-          <div class="id-label">Pass ${i + 1}</div>
-          <div class="room-label">${slot.station ? 'Room ' + slot.station : ''}</div>
+          <div class="id-label">Slot ${i + 1}</div>
+          <div class="room-label">${slot.room ? 'Room ' + slot.room : ''}</div>
         `;
         container.appendChild(box);
       });
     });
 }
 
-document.getElementById('check-form').addEventListener('submit', function(e) {
+document.getElementById('check-form')?.addEventListener('submit', function(e) {
   e.preventDefault();
   const formData = new FormData(this);
   fetch('/request_pass', {

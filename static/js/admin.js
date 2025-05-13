@@ -1,77 +1,70 @@
 let passTimers = {};
 
 /* ----------------------------------------------------------
-   Load / refresh the active‑pass table
+   Load / refresh the active-pass table
 ---------------------------------------------------------- */
 function loadPasses() {
-  const savedNotes = {};
-  document.querySelectorAll('[id^=note-]').forEach(inp => {
-    savedNotes[inp.id] = inp.value;
-  });
+  const tbody = document.getElementById('passes-table');
+  tbody.innerHTML = '';
+  passTimers = {};
 
   fetch('/admin_passes')
     .then(res => res.json())
     .then(data => {
-      const tbody = document.querySelector('#passes-table tbody');
-      tbody.innerHTML = '';
-      passTimers = {};
-
       data.forEach(p => {
         const row = tbody.insertRow();
-        const isPending = (p.status === 'pending');
+        row.className = p.status;
 
-        const actionHtml = isPending
-          ? `<button onclick="approve(${p.pass_id})">Approve</button>
-             <button onclick="reject(${p.pass_id})">Reject</button>`
-          : `<button onclick="manualCheckIn(${p.pass_id})">End&nbsp;Pass</button>`;
+        const actionHtml = (p.status === 'pending_start')
+          ? `<button onclick="approve(${p.id})">Approve</button>
+             <button onclick="reject(${p.id})">Reject</button>`
+          : `<button onclick="manualCheckIn(${p.id})">End Pass</button>`;
 
-        row.className = isPending ? 'pending-row' : '';
+        const lastTag = p.last_event === 'in'
+          ? '📍 In'
+          : p.last_event === 'out'
+          ? '➡️ Out'
+          : '—';
 
         row.innerHTML = `
-          <td>${p.pass_id}</td>
-          <td>${p.student_id}</td>
+          <td>${p.id}</td>
           <td>${p.student_name}</td>
-          <td>${p.room_time}</td>
-          <td>${p.station_in}</td>
-          <td>${p.station_out}</td>
-          <td id="timer-${p.pass_id}">${isPending ? '—' : p.elapsed}</td>
+          <td>${p.room}</td>
+          <td>${p.checkout || '—'}</td>
+          <td>${p.station_out || '—'}</td>
+          <td>${p.station_in || '—'}</td>
+          <td>${lastTag}</td>
+          <td id="timer-${p.id}">${p.elapsed || '—'}</td>
           <td>
-            <input type="text" id="note-${p.pass_id}"
-                   value="${savedNotes[`note-${p.pass_id}`] || p.note || ''}"
-                   placeholder="Add note">
-            <button onclick="addNote('${p.student_id}', '${p.pass_id}')">Save</button>
+            <input type="text" id="note-${p.id}" value="${p.note || ''}" placeholder="Add note">
+            <button onclick="addNote('${p.student_id}', '${p.id}')">Save</button>
           </td>
           <td>${p.is_override ? '✔️' : ''}</td>
           <td>${actionHtml}</td>
         `;
 
-        // For stopwatch
-        if (!isPending && p.room_time.includes('@')) {
-          const rawTime = p.room_time.split('@')[1].trim();
-          passTimers[p.pass_id] = rawTime;
+        if (p.status === 'active' && p.checkout) {
+          const parts = p.checkout.split(':').map(Number);
+          passTimers[p.id] = parts;
         }
       });
     });
 }
 
 /* ----------------------------------------------------------
-   Timer tick (updates each active row every second)
+   Timer tick
 ---------------------------------------------------------- */
 function updateTimers() {
   const now = new Date();
-  Object.entries(passTimers).forEach(([passId, timeOutStr]) => {
-    if (!timeOutStr) return;
-    const parts = timeOutStr.split(':').map(Number);
+  Object.entries(passTimers).forEach(([passId, parts]) => {
     const t0 = new Date();
     t0.setHours(parts[0], parts[1], parts[2], 0);
-
     let diff = Math.floor((now - t0) / 1000);
     diff = Math.max(diff, 0);
-
     const minutes = Math.floor(diff / 60);
     const seconds = diff % 60;
-    const timerEl = document.getElementById(`timer-${passId}`);
-    if (timerEl) timerEl.textContent = `${minutes}m ${seconds}s`;
+    const cell = document.getElementById(`timer-${passId}`);
+    if (cell) cell.textContent = `${minutes}m ${seconds}s`;
   });
 }
 
@@ -81,19 +74,28 @@ function updateTimers() {
 function manualCheckIn(passId) {
   fetch(`/admin_checkin/${passId}`, { method: 'POST' })
     .then(res => res.json())
-    .then(data => { alert(data.message); loadPasses(); });
+    .then(data => {
+      alert(data.message);
+      loadPasses();
+    });
 }
 
 function approve(passId) {
   fetch(`/admin/approve/${passId}`, { method: 'POST' })
     .then(res => res.json())
-    .then(data => { alert(data.message); loadPasses(); });
+    .then(data => {
+      alert(data.message);
+      loadPasses();
+    });
 }
 
 function reject(passId) {
   fetch(`/admin/reject/${passId}`, { method: 'POST' })
     .then(res => res.json())
-    .then(data => { alert(data.message); loadPasses(); });
+    .then(data => {
+      alert(data.message);
+      loadPasses();
+    });
 }
 
 function addNote(studentId, passId) {
@@ -108,9 +110,9 @@ function addNote(studentId, passId) {
 }
 
 /* ----------------------------------------------------------
-   Override-pass creator
+   Create override pass
 ---------------------------------------------------------- */
-document.getElementById('create-pass-form').addEventListener('submit', function (e) {
+document.getElementById('create-pass-form')?.addEventListener('submit', function (e) {
   e.preventDefault();
   const studentId = document.getElementById('student_id').value.trim();
   fetch('/admin_create_pass', {
@@ -127,9 +129,9 @@ document.getElementById('create-pass-form').addEventListener('submit', function 
 });
 
 /* ----------------------------------------------------------
-   Change‑password handler
+   Change admin password
 ---------------------------------------------------------- */
-document.getElementById('change-password-form').addEventListener('submit', function (e) {
+document.getElementById('change-password-form')?.addEventListener('submit', function (e) {
   e.preventDefault();
   const currentPass = document.getElementById('current_pass').value;
   const newPass = document.getElementById('new_pass').value;
@@ -152,7 +154,7 @@ document.getElementById('change-password-form').addEventListener('submit', funct
 });
 
 /* ----------------------------------------------------------
-   Smart conditional refresh every 10s if new pending requests
+   Smart refresh on pending changes
 ---------------------------------------------------------- */
 let previousPendingCount = 0;
 
@@ -162,22 +164,16 @@ function checkForPendingChanges() {
     .then(data => {
       const total = data.pending_start + data.pending_return;
       if (total > previousPendingCount) {
-        window.location.reload();
+        alert("New pending request(s).");
       }
       previousPendingCount = total;
     });
 }
 
-// Check every 10 seconds
+/* ----------------------------------------------------------
+   Kickoff
+---------------------------------------------------------- */
+setInterval(updateTimers, 1000);
+setInterval(loadPasses, 5000);
 setInterval(checkForPendingChanges, 10000);
-/* ----------------------------------------------------------
-   Manual “Refresh All” nav link
----------------------------------------------------------- */
-function manualRefresh() { loadPasses(); }
-
-/* ----------------------------------------------------------
-   Kick-off intervals
----------------------------------------------------------- */
-setInterval(updateTimers, 1000);   // stopwatch
-setInterval(loadPasses, 5000);     // table refresh
 loadPasses();

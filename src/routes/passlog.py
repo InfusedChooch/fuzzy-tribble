@@ -85,7 +85,6 @@ def station_log():
 # ------------------------------------------------------------------
 @passlog_bp.route('/station_console', methods=['GET', 'POST'])
 def station_console():
-    """Kiosk UI that lets a student scan in/out at Bathroom, Nurse, etc."""
     if 'station_id' not in session:
         return redirect(url_for('passlog.station_setup'))
 
@@ -101,28 +100,23 @@ def station_console():
         if not student:
             message = "Invalid student ID"
         else:
-            # Student must already have an ACTIVE pass that originated from their room
             existing = Pass.query.filter_by(student_id=student.id, checkin_time=None).first()
-            if not existing:
-                message = "You don’t have an active pass to use this station."
-            else:
-                # Toggle between OUT and IN events
-                last_event_out = PassLog.query.filter_by(pass_id=existing.id, event_type="out").order_by(PassLog.timestamp.desc()).first()
+
+            if existing:
+                last_event_out = PassLog.query.filter_by(pass_id=existing.id, event_type="out")\
+                    .order_by(PassLog.timestamp.desc()).first()
                 if last_event_out and (datetime.utcnow() - last_event_out.timestamp).total_seconds() < 30:
-                    # Prevent duplicate scans in quick succession
                     message = "Swipe already recorded."
                 else:
                     new_event_type = "in" if station == existing.station else "out"
-                    session['event_type'] = new_event_type  # for debug / testing
                     new_log = PassLog(
-                        pass_id   = existing.id,
-                        station   = station,
-                        timestamp = datetime.utcnow(),
-                        event_type= new_event_type
+                        pass_id=existing.id,
+                        station=station,
+                        timestamp=datetime.utcnow(),
+                        event_type=new_event_type
                     )
                     db.session.add(new_log)
 
-                    # Auto‑close if returning to origin room
                     if new_event_type == "in" and station == existing.station:
                         existing.checkin_time = datetime.now().time()
                         delta = datetime.combine(date.today(), existing.checkin_time) - \
@@ -130,19 +124,33 @@ def station_console():
                         existing.total_pass_time = int(delta.total_seconds())
                         existing.status = STATUS_RETURNED
                     else:
-                        existing.status = STATUS_ACTIVE  # stays active while travelling
+                        existing.status = STATUS_ACTIVE
 
                     db.session.commit()
                     message = f"{student.name} {new_event_type} recorded at {station}."
+            else:
+                # Allow check-out if station is a room number
+                if station.isdigit():
+                    new_pass = Pass(
+                        student_id=student.id,
+                        date=datetime.now().date(),
+                        period=current_period,
+                        checkout_time=datetime.now().time(),
+                        station=station,
+                        status=STATUS_PENDING_START
+                    )
+                    db.session.add(new_pass)
+                    db.session.commit()
+                    message = f"Pass request submitted from Room {station}."
+                else:
+                    message = "You don’t have an active pass to use this station."
 
-    # Display passes from this room currently out
     passes = Pass.query.filter_by(checkin_time=None).all()
     out = []
     for p in passes:
         stu = p.student
         if not stu:
             continue
-        # Only show passes whose destination is _this_ station (room) OR this station is the origin room
         if p.station == station or station in special_stations:
             out.append({
                 "student_name": stu.name,
@@ -151,6 +159,7 @@ def station_console():
             })
 
     return render_template('station.html', station=station, passes=out, message=message)
+
 
 # ------------------------------------------------------------------
 # Station selector (set station_id in session for this browser)
