@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Weekly Summary</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <h1>Weekly Summary Report</h1>
+  <a href="{{ url_for('admin.admin_view') }}">← Back to Admin Panel</a>
+  <a href="{{ url_for('report.admin_report_csv') }}" style="float:right;">Download CSV</a>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Student</th><th>ID</th><th>M T W T F (min)</th>
+        <th># >5min</th><th># >10min</th><th>Override?</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in report_data %}
+      <tr>
+        <td>{{ row.student_name }}</td>
+        <td>{{ row.student_id }}</td>
+        <td>{{ row.weekly_report }}</td>
+        <td>{{ row.passes_over_5_min }}</td>
+        <td>{{ row.passes_over_10_min }}</td>
+        <td>{{ row.used_override }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

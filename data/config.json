@@ -7,7 +7,7 @@
     "session_timeout_minutes": 60,
     "period_schedule": {
         "0": {
-            "start": "08:25",
+            "start": "08:00",
             "end": "08:30"
         },
         "1": {
@@ -62,7 +62,7 @@
         }
     },
     "max_pass_time_seconds": 2400,
-    "passes_available": 3,
+    "passes_available": 2,
     "auto_reset_time": "23:59",
     "theme_color": "#4a90e2",
     "school_name": "TJMS",

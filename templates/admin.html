@@ -5,11 +5,20 @@
   <title>Admin Panel</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
+  th {
+    background-color: #e4e4e4 !important;
+    color: #000 !important;
+  }
+</style>
+
+  <style>
     table { width: 100%; margin-bottom: 2em; border-collapse: collapse; }
     th, td { padding: .5em; border: 1px solid #ccc; text-align: center; }
     .pending_start { background: #cfe2ff; }
     .pending_return { background: #ffedc7; }
     .active { background: #ffd6d6; }
+    .collapsible { background: #eee; cursor: pointer; padding: 10px; text-align: left; width: 100%; border: none; font-size: 1.1em; margin-top: 10px; }
+    .content { display: block; }
   </style>
 </head>
 <body>
@@ -17,67 +26,137 @@
 
   <nav>
     <a href="{{ url_for('auth.admin_logout') }}">Logout</a> |
-    <a href="{{ url_for('admin.set_station') }}">Set This Console as Station</a> |
     <a href="{{ url_for('admin.admin_pass_history') }}">Pass History</a> |
-    <a href="{{ url_for('report.admin_report_csv') }}">Download Weekly&nbsp;CSV</a>
+    <a href="{{ url_for('admin.admin_weekly_summary') }}">View Weekly Summary →</a> |
+    <button onclick="location.reload()">🔄 Refresh All</button>
   </nav>
 
-  <h3>Pop Out Station View</h3>
-  <form id="station-popout-form" onsubmit="openStationView(event)">
-    <select id="station-selector">
-      {% for room in station_rooms %}
-        <option value="{{ room }}">{{ room }}</option>
-      {% endfor %}
-    </select>
+  <small style="display:block; margin-top: 5px; font-size: 0.9em;">
+    📍 <strong>Open Stations:</strong>
+    {% for r in active_rooms %}
+      <code>{{ r }}</code>{% if not loop.last %}, {% endif %}
+    {% else %}
+      <em>None</em>
+    {% endfor %}
+  </small>
+
+<!-- Admin Tools -->
+<h2>Quick Admin Tools</h2>
+<div style="display: flex; gap: 2em; align-items: flex-end; flex-wrap: wrap;">
+  <!-- Pop Out Station -->
+  <form id="station-popout-form" onsubmit="openStationView(event)" style="flex: 1; min-width: 260px;">
+    <label><strong>Pop Out Station</strong></label><br>
+    <input list="stations" id="station-selector" placeholder="Bathroom, Nurse, etc." required>
+    <datalist id="stations">
+      <option value="Bathroom">
+      <option value="Nurse">
+      <option value="Library">
+      <option value="Office">
+    </datalist>
     <button type="submit">Open Station Window</button>
   </form>
 
-  <!-- ------------------------------------------------------------ -->
-  <h2>Create Override Pass</h2>
-  <form id="create-pass-form">
+  <!-- Create Override Pass -->
+  <form id="create-pass-form" style="flex: 1; min-width: 260px;">
+    <label><strong>Create Override Pass</strong></label><br>
     <input type="text" id="student_id" placeholder="Student ID" required>
     <button type="submit">Create Override</button>
   </form>
+</div>
 
-  <!-- ------------------------------------------------------------ -->
-  <h2>Live Pass Table</h2>
+  <!-- Collapse All -->
+  <button id="toggle-all" style="margin: 1em 0;">🔽 Collapse All</button>
+
+<!-- Collapsible: Pending All (merged) -->
+<button class="collapsible">Pending Requests</button>
+    <div class="content">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Student</th>
+          <th>Room (Requested From)</th>
+          <th>Time</th>
+          <th>Type</th> 
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="pending-table">
+        <!-- will be filled dynamically -->
+      </tbody>
+    </table>
+</div>
+
+<!-- Collapsible: Active Passes -->
+<button class="collapsible">Active Passes</button>
+<div class="content">
   <table>
     <thead>
       <tr>
-        <th>ID</th><th>Student</th><th>Room</th><th>Out</th>
-        <th>Station&nbsp;OUT</th><th>Station&nbsp;IN</th><th>Last</th>
-        <th>Time</th><th>Note</th><th>Override</th><th>Action</th>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Date</th>
+        <th>Period</th>
+        <th>Room Out</th>
+        <th>Station In</th>
+        <th>Station Out</th>
+        <th>Room In</th>
+        <th>Total</th>
+        <th>Hallway</th>
+        <th>Station</th>
+        <th>Action</th>
+        <th>Note</th>
+        <th>Status / Override</th>
       </tr>
     </thead>
     <tbody id="passes-table">
-      <!-- Filled by admin.js -->
+      <!-- JavaScript injects here -->
     </tbody>
   </table>
+</div>
 
-  <!-- ------------------------------------------------------------ -->
-  <h2>Weekly Summary (Mon‑Fri)</h2>
+<!-- Recent Passes -->
+  <h2>Recently Returned Passes</h2>
   <table>
     <thead>
       <tr>
-        <th>Student</th><th>ID</th><th>M&nbsp;T&nbsp;W&nbsp;T&nbsp;F&nbsp;(min)</th>
-        <th>#&nbsp;>5&nbsp;min</th><th>#&nbsp;>10&nbsp;min</th><th>Override?</th>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Date</th>
+        <th>Period</th>
+        <th>Room Out</th>
+        <th>Station In</th>
+        <th>Station Out</th>
+        <th>Room In</th>
+        <th>Total</th>
+        <th>Hallway</th>
+        <th>Station</th>
+        <th>Note</th>
+        <th>Override</th>
       </tr>
     </thead>
     <tbody>
-    {% for row in report_data %}
+      {% for p in recent_returns %}
       <tr>
-        <td>{{ row.student_name }}</td>
-        <td>{{ row.student_id }}</td>
-        <td>{{ row.weekly_report }}</td>
-        <td>{{ row.passes_over_5_min }}</td>
-        <td>{{ row.passes_over_10_min }}</td>
-        <td>{{ row.used_override }}</td>
+        <td>{{ p.id }}</td>
+        <td>{{ p.student_name }}</td>
+        <td>{{ p.date }}</td>
+        <td>{{ p.period }}</td>
+        <td>{{ p.room_out }}</td>
+        <td>{{ p.station_in }}</td>
+        <td>{{ p.station_out }}</td>
+        <td>{{ p.room_in }}</td>
+        <td>{{ p.elapsed }}</td>
+        <td>{{ p.hallway_time }}</td>
+        <td>{{ p.station_time }}</td>
+        <td>{{ p.note }}</td>
+        <td>{{ p.override }}</td>
       </tr>
-    {% endfor %}
+      {% endfor %}
     </tbody>
   </table>
 
-  <!-- ------------------------------------------------------------ -->
+
   <h2>Change Admin Password</h2>
   <form id="change-password-form">
     <input type="password" id="current_pass" placeholder="Current Password" required>
@@ -88,13 +167,5 @@
   </form>
 
   <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
-  <script>
-    function openStationView(event) {
-      event.preventDefault();
-      const station = document.getElementById('station-selector').value;
-      const url = `/station_view/${station}`;
-      window.open(url, '_blank', 'width=800,height=600');
-    }
-  </script>
 </body>
 </html>

@@ -7,37 +7,49 @@
 <body>
   <h1>Checked-In Passes</h1>
   <a href="{{ url_for('admin.admin_view') }}">← Back to Admin Panel</a>
+  <a href="{{ url_for('admin.admin_pass_history') }}?export=csv" class="button">
+    ⬇️ Export to CSV </a>
+</div>
 
 <table>
   <thead>
     <tr>
-      <th>Student</th>
+      <th>ID</th> 
+      <th>Name</th>
       <th>Date</th>
       <th>Period</th>
       <th>Room Out</th>
       <th>Station In</th>
       <th>Station Out</th>
       <th>Room In</th>
-      <th>Duration</th>
-      <th>Notes + Override</th>
+      <th>Total</th>
+      <th>Hallway</th>
+      <th>Station</th>
+      <th>Note</th>
+      <th>Override</th>
     </tr>
   </thead>
   <tbody>
-    {% for row in rows %}
+    {% for r in rows %}
     <tr>
-      <td>{{ row.student }}</td>
-      <td>{{ row.date }}</td>
-      <td>{{ row.period }}</td>
-      <td>{{ row.room_out }}</td>
-      <td>{{ row.station_in }}</td>
-      <td>{{ row.station_out }}</td>
-      <td>{{ row.room_in }}</td>
-      <td>{{ row.duration }}</td>
-      <td>{{ row.note }}</td>
+      <td>{{ r.id }}</td>
+      <td>{{ r.student }}</td>
+      <td>{{ r.date }}</td>
+      <td>{{ r.period }}</td>
+      <td>{{ r.room_out }}</td>
+      <td>{{ r.station_in }}</td>
+      <td>{{ r.station_out }}</td>
+      <td>{{ r.room_in }}</td>
+      <td>{{ r.duration }}</td>
+      <td>{{ r.hallway }}</td>
+      <td>{{ r.station }}</td>
+      <td>{{ r.note }}</td>
+      <td>{{ r.override }}</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+
 
 </body>
 </html>

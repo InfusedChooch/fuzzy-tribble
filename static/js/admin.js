@@ -5,6 +5,15 @@ let passTimers = {};
 ---------------------------------------------------------- */
 function loadPasses() {
   const tbody = document.getElementById('passes-table');
+  if (!tbody) return;
+
+  // 📝 Preserve note input values before refresh
+  let currentNotes = {};
+  document.querySelectorAll('[id^="note-"]').forEach(input => {
+    const passId = input.id.split('-')[1];
+    currentNotes[passId] = input.value;
+  });
+
   tbody.innerHTML = '';
   passTimers = {};
 
@@ -15,44 +24,84 @@ function loadPasses() {
         const row = tbody.insertRow();
         row.className = p.status;
 
-        const actionHtml = (p.status === 'pending_start')
-          ? `<button onclick="approve(${p.id})">Approve</button>
-             <button onclick="reject(${p.id})">Reject</button>`
-          : `<button onclick="manualCheckIn(${p.id})">End Pass</button>`;
+        const statusLabel = (p.status === 'pending_return') ? '🟡 Pending Stop' : '';
 
-        const lastTag = p.last_event === 'in'
-          ? '📍 In'
-          : p.last_event === 'out'
-          ? '➡️ Out'
-          : '—';
+        const actionHtml = (p.status === 'pending_start')
+          ? `<button onclick="approve(${p.pass_id})">Approve</button>
+             <button onclick="reject(${p.pass_id})">Reject</button>`
+          : `<button onclick="manualCheckIn(${p.pass_id})">End Pass</button>`;
 
         row.innerHTML = `
-          <td>${p.id}</td>
+          <td>${p.pass_id}</td>
           <td>${p.student_name}</td>
-          <td>${p.room}</td>
-          <td>${p.checkout || '—'}</td>
-          <td>${p.station_out || '—'}</td>
+          <td>${p.date || '—'}</td>
+          <td>${p.period || '—'}</td>
+          <td>${p.room_time || '—'}</td>
           <td>${p.station_in || '—'}</td>
-          <td>${lastTag}</td>
-          <td id="timer-${p.id}">${p.elapsed || '—'}</td>
-          <td>
-            <input type="text" id="note-${p.id}" value="${p.note || ''}" placeholder="Add note">
-            <button onclick="addNote('${p.student_id}', '${p.id}')">Save</button>
-          </td>
-          <td>${p.is_override ? '✔️' : ''}</td>
+          <td>${p.station_out || '—'}</td>
+          <td>${p.room_in || '—'}</td>
+          <td id="timer-${p.pass_id}">${p.elapsed || '—'}</td>
+          <td>${p.hallway_time || '—'}</td>
+          <td>${p.station_time || '—'}</td>
           <td>${actionHtml}</td>
+          <td>
+            <input type="text" id="note-${p.pass_id}" value="${p.note || ''}" placeholder="Add note">
+            <button onclick="addNote('${p.student_id}', '${p.pass_id}')">Save</button>
+          </td>
+          <td>${statusLabel} ${p.is_override ? '✔️' : ''}</td>
         `;
 
-        if (p.status === 'active' && p.checkout) {
-          const parts = p.checkout.split(':').map(Number);
-          passTimers[p.id] = parts;
+        // 📝 Restore previous note input after refresh
+        const noteInput = document.getElementById(`note-${p.pass_id}`);
+        if (noteInput && currentNotes[p.pass_id] !== undefined) {
+          noteInput.value = currentNotes[p.pass_id];
+        }
+
+        if (p.status === 'active' && p.room_time && p.room_time.includes('@')) {
+          const timePart = p.room_time.split('@')[1].trim();
+          const parts = timePart.split(':').map(Number);
+          passTimers[p.pass_id] = parts;
         }
       });
     });
 }
 
+function loadPendingPasses() {
+  const tbody = document.getElementById('pending-table');
+  if (!tbody) return;
+
+  fetch('/admin_pending_passes')
+    .then(res => res.json())
+    .then(data => {
+      tbody.innerHTML = '';
+      data.forEach(p => {
+        const row = tbody.insertRow();
+        row.className = p.status;
+
+        const actionCell = (p.status === 'pending_start')
+          ? `<button onclick="approve(${p.pass_id})">Approve</button>
+             <button onclick="reject(${p.pass_id})">Reject</button>`
+          : `<button onclick="manualCheckIn(${p.pass_id})">End Pass</button>`;
+
+        row.innerHTML = `
+          <td>${p.student_id}</td>
+          <td>${p.student_name}</td>
+          <td>${p.room}</td>
+          <td>${p.time}</td>
+          <td>${p.status === 'pending_start' ? 'Start' : 'Stop'}</td>
+          <td>
+            ${p.status === 'pending_start'
+              ? `<button onclick="approve(${p.pass_id})">Approve</button>
+                <button onclick="reject(${p.pass_id})">Reject</button>`
+              : `<button onclick="manualCheckIn(${p.pass_id})">End Pass</button>`}
+          </td>
+        `;
+      });
+    });
+}
+
 /* ----------------------------------------------------------
-   Timer tick
+   Timer tick updater
 ---------------------------------------------------------- */
 function updateTimers() {
   const now = new Date();
@@ -106,7 +155,10 @@ function addNote(studentId, passId) {
     body: JSON.stringify({ note })
   })
     .then(res => res.json())
-    .then(data => { alert(data.message); });
+    .then(data => {
+      alert(data.message);
+      loadPasses();
+    });
 }
 
 /* ----------------------------------------------------------
@@ -154,26 +206,68 @@ document.getElementById('change-password-form')?.addEventListener('submit', func
 });
 
 /* ----------------------------------------------------------
-   Smart refresh on pending changes
+   Smart refresh for new pending alerts (silent)
 ---------------------------------------------------------- */
-let previousPendingCount = 0;
-
 function checkForPendingChanges() {
   fetch('/admin_pending_count')
     .then(res => res.json())
     .then(data => {
-      const total = data.pending_start + data.pending_return;
-      if (total > previousPendingCount) {
-        alert("New pending request(s).");
-      }
-      previousPendingCount = total;
+      // Silent refresh only
     });
 }
 
 /* ----------------------------------------------------------
-   Kickoff
+   Open popout station view
+---------------------------------------------------------- */
+function openStationView(event) {
+  event.preventDefault();
+  const station = document.getElementById('station-selector')?.value;
+  if (station) {
+    window.open(`/station_view/${station}`, '_blank', 'width=800,height=600');
+  }
+}
+
+/* ----------------------------------------------------------
+   Collapsible section memory + toggle all
+---------------------------------------------------------- */
+document.addEventListener("DOMContentLoaded", () => {
+  const toggleAllBtn = document.getElementById("toggle-all");
+  const collapsibles = Array.from(document.querySelectorAll(".collapsible"));
+
+  collapsibles.forEach((btn, index) => {
+    const key = `collapsible-${index}`;
+    const content = btn.nextElementSibling;
+    const saved = localStorage.getItem(key);
+    content.style.display = saved === "none" ? "none" : "block";
+
+    btn.addEventListener("click", () => {
+      const isOpen = content.style.display !== "none";
+      content.style.display = isOpen ? "none" : "block";
+      localStorage.setItem(key, isOpen ? "none" : "block");
+    });
+  });
+
+  if (toggleAllBtn) {
+    toggleAllBtn.addEventListener("click", () => {
+      const anyOpen = collapsibles.some(btn => btn.nextElementSibling.style.display !== "none");
+      collapsibles.forEach((btn, index) => {
+        const key = `collapsible-${index}`;
+        const content = btn.nextElementSibling;
+        const newState = anyOpen ? "none" : "block";
+        content.style.display = newState;
+        localStorage.setItem(key, newState);
+      });
+      toggleAllBtn.textContent = anyOpen ? "🔼 Expand All" : "🔽 Collapse All";
+    });
+  }
+});
+
+/* ----------------------------------------------------------
+   Kickoff interval updates
 ---------------------------------------------------------- */
 setInterval(updateTimers, 1000);
 setInterval(loadPasses, 5000);
 setInterval(checkForPendingChanges, 10000);
+setInterval(loadPendingPasses, 5000);
+loadPendingPasses();
 loadPasses();

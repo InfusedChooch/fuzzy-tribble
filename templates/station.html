@@ -10,10 +10,17 @@
     input { padding:0.6em 1em; width:220px; }
     button { padding:0.6em 1.2em; }
     .message { color:red; margin:1em; font-weight:bold; }
-    table { margin:2em auto; border-collapse:collapse; width:60%; }
-    th,td { border:1px solid #ccc; padding:0.4em 0.6em; }
-    .active  { background:#ffd6d6; }
-    .pending { background:#ffedc7; }
+    .passes { display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; margin-top: 20px; }
+    .pass-box {
+      width: 160px; height: 160px; border: 3px solid #333; border-radius: 10px;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      font-size: 1.2em; background-color: #fff;
+    }
+    .pass-box.pending_start  { background-color: #cfe2ff; }
+    .pass-box.pending_return { background-color: #ffedc7; }
+    .pass-box.active         { background-color: #ffd6d6; }
+    .pass-box.free           { background-color: #dfffdf; }
+    .symbol { font-size: 2em; margin-bottom: 0.5em; }
   </style>
 </head>
 <body>
@@ -27,20 +34,47 @@
     <button type="submit">Submit</button>
   </form>
 
-  <h2>Passes involving this station</h2>
-  <table>
-    <thead>
-      <tr><th>Student</th><th>Status</th><th>Origin Room</th></tr>
-    </thead>
-    <tbody>
-      {% for p in passes %}
-      <tr class="{{ p.status }}">
-        <td>{{ p.student_name }}</td>
-        <td>{{ p.status }}</td>
-        <td>{{ p.room }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="clock" id="kiosk-clock" style="font-size: 2.5em; margin: 2em 0;"></div>
+
+
+  <hr>
+  <button onclick="promptCloseStation()">🔒 Close This Station</button>
+
+  <script>
+  function promptCloseStation() {
+    const password = prompt("Enter admin password to close this station:");
+    if (!password) return;
+
+    fetch("/close_station", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password })
+    })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message);
+        if (data.message.includes("closed")) {
+          window.location.href = "/station_setup";
+        }
+      });
+  }
+  </script>
+  <script>
+setInterval(() => {
+  fetch("/station_heartbeat", { method: "POST" });
+}, 30000); // every 30 seconds
+</script>
+
+<script>
+  function updateKioskClock() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const s = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('kiosk-clock').textContent = `${h}:${m}:${s}`;
+  }
+  setInterval(updateKioskClock, 1000);
+  updateKioskClock();
+</script>
 </body>
 </html>

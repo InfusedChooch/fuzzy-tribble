@@ -1,35 +1,32 @@
 # main.py – unified status flows and fixes while preserving original routes
 from flask import render_template, request, redirect, url_for, session, jsonify
-from datetime import datetime, date
+from datetime import datetime, date, timedelta, timezone
 from src import create_app
 from src.models import db, Student, Pass, AuditLog
-import json
+import json, os, time
 from src.utils import get_active_rooms
+from threading import Thread
 
 app = create_app()
 
-# ------------------------------------------------------------------
-# Unified pass‑status constants
-# ------------------------------------------------------------------
+# Unified status constants
 STATUS_PENDING_START  = "pending_start"
 STATUS_PENDING_RETURN = "pending_return"
 STATUS_ACTIVE         = "active"
 STATUS_RETURNED       = "returned"
 
-# ------------------------------------------------------------------
-# Config loader
-# ------------------------------------------------------------------
+# Load config
 def load_config():
     try:
         with open('data/config.json') as f:
             return json.load(f)
-    except Exception:
+    except:
         return {}
 
 config = load_config()
 
+# Period helper
 def get_current_period():
-    """Return the current period ID as a string (e.g., '1')."""
     now = datetime.now().time()
     for period, times in config.get("period_schedule", {}).items():
         start = datetime.strptime(times["start"], "%H:%M").time()
@@ -37,6 +34,44 @@ def get_current_period():
         if start <= now <= end:
             return str(period)
     return "N/A"
+
+# Cleanup inactive rooms thread
+def cleanup_inactive_rooms(interval=60, timeout=120):
+    heartbeat_path = 'data/station_heartbeat.json'
+    active_path = 'data/active_rooms.json'
+
+    while True:
+        now = datetime.now(timezone.utc)
+        try:
+            with open(heartbeat_path, 'r') as f:
+                beats = json.load(f)
+        except:
+            beats = {}
+
+        try:
+            with open(active_path, 'r') as f:
+                active = set(json.load(f))
+        except:
+            active = set()
+
+        to_remove = set()
+        for station, stamp in beats.items():
+            try:
+                last_seen = datetime.fromisoformat(stamp)
+                if (now - last_seen).total_seconds() > timeout:
+                    to_remove.add(station)
+            except:
+                continue
+
+        if to_remove:
+            updated = active - to_remove
+            with open(active_path, 'w') as f:
+                json.dump(sorted(updated), f)
+
+        time.sleep(interval)
+
+# Start cleanup thread
+Thread(target=cleanup_inactive_rooms, daemon=True).start()
 
 # ------------------------------------------------------------------
 # LOGIN ROUTE
@@ -50,7 +85,7 @@ def login():
         if user.lower() == admin_username.lower():
             return redirect(url_for('auth.admin_login'))
 
-        student = Student.query.get(user)
+        student = db.session.get(Student, user)
         if not student:
             return render_template('login.html', error="ID not recognized.")
 
@@ -73,7 +108,7 @@ def index():
     if 'student_id' not in session:
         return redirect(url_for('login'))
 
-    student = Student.query.get(session['student_id'])
+    student = db.session.get(Student, session['student_id'])
     current_period = get_current_period()
     current_room = student.schedule.get(current_period)
     if current_room not in get_active_rooms():
@@ -88,7 +123,7 @@ def passroom_view(room):
     if 'student_id' not in session:
         return redirect(url_for('login'))
 
-    student = Student.query.get(session['student_id'])
+    student = db.session.get(Student, session['student_id'])
     current_period = get_current_period()
     scheduled_room = student.schedule.get(current_period)
 
@@ -98,35 +133,35 @@ def passroom_view(room):
     if room not in get_active_rooms():
         return render_template('login.html', error=f"Room {room} is not active right now.")
 
-    message = ""
-
     if request.method == 'POST':
         student_id_form = request.form.get('student_id', '').strip()
         if student_id_form != student.id:
-            message = "That ID doesn't match your login."
+            session['passroom_message'] = "That ID doesn't match your login."
         else:
             existing = Pass.query.filter_by(student_id=student.id, checkin_time=None).first()
             if existing:
                 if existing.status == STATUS_ACTIVE:
                     existing.status = STATUS_PENDING_RETURN
                     db.session.commit()
-                    message = "Return request submitted."
+                    session['passroom_message'] = "Return request submitted."
                 else:
-                    message = "You already have a pending pass."
+                    session['passroom_message'] = "You already have a pending pass."
             else:
                 new_pass = Pass(
                     student_id=student.id,
                     date=datetime.now().date(),
                     period=current_period,
-                    checkout_time=datetime.now().time(),
                     station=room,
+                    checkout_time=datetime.now().time(),
                     status=STATUS_PENDING_START
                 )
                 db.session.add(new_pass)
                 db.session.commit()
-                message = "Pass request submitted."
+                session['passroom_message'] = "Pass request submitted."
+        return redirect(url_for('passroom_view', room=room))
 
-    # Fetch passes for this room & period
+    message = session.pop('passroom_message', '')
+
     passes = Pass.query.filter_by(
         date=datetime.now().date(),
         period=current_period,
@@ -138,7 +173,8 @@ def passroom_view(room):
         "status": p.status
     } for p in passes]
 
-    while len(display_passes) < 3:
+    passes_available = config.get("passes_available", 3)
+    while len(display_passes) < passes_available:
         display_passes.append({"student_name": None, "status": "free"})
 
     return render_template(
@@ -180,6 +216,12 @@ def debug_period():
 @app.route('/debug_rooms')
 def debug_rooms():
     return jsonify(sorted(list(get_active_rooms())))
+
+@app.route('/debug/active_rooms')
+def debug_active_rooms():
+    from src.utils import get_active_rooms
+    return jsonify(sorted(list(get_active_rooms())))
+
 
 @app.route('/debug_students')
 def debug_students():

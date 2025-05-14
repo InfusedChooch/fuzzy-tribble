@@ -1,4 +1,3 @@
-<!-- PATCHED index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,8 +16,7 @@
   <h2>Period: {{ current_period }}</h2>
 
   <div id="pass-grid" class="passes">
-    {% set padded_passes = passes + ([{'student_name': None, 'status': 'free'}] * (3 - passes|length)) %}
-    {% for p in padded_passes[:3] %}
+    {% for p in passes %}
       <div class="pass-box {{ p.status }}">
         <div class="symbol">
           {% if p.status == 'free' %}
