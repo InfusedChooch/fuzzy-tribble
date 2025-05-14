@@ -1,38 +1,60 @@
-# Hall Pass Tracker (v0.4)
+# Hall Pass Tracker (v0.5)
 
-A Flask-based digital hall pass system for managing student movement in schools. Designed for classroom use with student-facing check-in and admin-facing monitoring and reporting.
+A Flask-based digital hall pass system for managing student movement across rooms and stations. Built for school use with student-facing kiosks and a robust admin panel for live monitoring, overrides, logs, and reports.
 
 ---
 
-## 🔧 Features (v0.4)
+## 🔧 Features (v0.5)
 
 ### ✅ Student Features
 
-* Sign in/out of hall passes using Student ID
-* Passes tracked by period with time and duration
-* Destinations/stations (e.g., Bathroom, Nurse) logged per visit
+* Login using Student ID
+* Request pass from scheduled room
+* Request return when finished
+* Sign in/out of hallway stations (Bathroom, Nurse, Library, Office)
+* Auto-end pass when returning to original room station
 
 ### ✅ Admin Features
 
-* Password-protected login
-* Create override passes (e.g., send a student out directly)
-* View active passes, timer, duration, notes
-* See most recent station log timeline per student
-* Edit admin password in-panel
-* View recent pass history (last 10 returned)
-* Weekly reports with time summaries and CSV export
-* Add/remove students via CSV upload or individual form
-* Set up stations via dropdown on kiosk devices (no password required)
+* Secure login with editable username & password
+* Create override passes
+* Monitor all pending/active passes live (auto-refresh every 5 sec)
+* Approve/reject pass requests from a unified pending list
+* End any active pass manually
+* Add/update notes on any open pass
+* View 50 most recent returned passes with detailed timestamps:
+
+  * Room Out + Time
+  * Station In + Out + Duration
+  * Room In + Time
+  * Hallway vs Station Time
+* Access weekly summary with pass stats and override tracking
+* Export final logs and weekly summary to CSV
+* Open live station kiosk from admin panel
+* Assign current browser’s station ID (room or fixed station)
+* Upload/download student roster (CSV w/ JSON schedules)
 
 ---
 
-## 💡 How Station Logging Works
+## 🛠 Station & Room Behavior
 
-1. Admin defines list of stations in `config.json`
-2. A kiosk (student terminal) visits `/station_setup`
-3. The user picks a station (e.g., "Bathroom"), stored in session
-4. Students type in ID and log each station visit during their pass
-5. Admin sees the timeline of stations visited for each pass
+* Stations like Bathroom/Nurse/Library are "fixed" and appear in a dropdown
+* All other numeric rooms (e.g., 101, 202) must be typed manually when opening a station
+* Station logs track IN → OUT events and automatically end the pass if returning to the original room
+* Total pass time = room checkout → check-in
+* Station time = difference between IN and OUT logs
+* Hallway time = total pass time – station time
+
+---
+
+## 🧪 Pass Lifecycle (Request Flow)
+
+1. **Student login** ➔ redirect to their scheduled room
+2. **Request pass** ➔ mark as `pending_start`
+3. **Admin approves** ➔ pass becomes `active`
+4. **Student visits station** ➔ IN/OUT log created
+5. **Student clicks return** ➔ becomes `pending_return`
+6. **Admin approves** ➔ pass marked `returned` with timestamps + stats
 
 ---
 
@@ -40,30 +62,29 @@ A Flask-based digital hall pass system for managing student movement in schools.
 
 ```
 hall_pass_app/
-├── main.py                 # Launches the app
+├── main.py                 # App entry and login routes
 ├── config.json             # Admin credentials, station list, period schedule
-├── /data/                  # SQLite DB and CSV files
+├── /data/                  # JSON files for heartbeat, active rooms
 ├── /src/
-│   ├── __init__.py
-│   ├── models.py
+│   ├── models.py           # SQLAlchemy models
 │   └── routes/
-│       ├── admin.py
-│       ├── auth.py
-│       ├── students.py
-│       ├── report.py
-│       └── passlog.py
-├── /templates/
-│   ├── index.html
-│   ├── admin.html
-│   ├── admin_login.html
-│   ├── students.html
-│   ├── admin_report.html
-│   ├── station.html
-│   └── station_setup.html
-├── /static/
-│   ├── css/style.css
-│   ├── js/index.js
-│   └── js/admin.js
+│       ├── admin.py        # Admin dashboard + reporting
+│       ├── auth.py         # Login/logout/session timeout
+│       ├── students.py     # Roster upload/download
+│       ├── passlog.py      # Station IN/OUT logic
+│       └── report.py       # Weekly and final CSV exports
+├── /templates/             # HTML views
+│   ├── index.html          # Student room view
+│   ├── admin.html          # Admin dashboard
+│   ├── login.html          # Initial login page
+│   ├── station.html        # Kiosk view (station_console)
+│   ├── station_setup.html  # Pick station for device
+│   └── others…
+└── /static/
+    ├── css/style.css       # Styling
+    └── js/
+        ├── index.js        # Student grid logic
+        └── admin.js        # Live updates & admin actions
 ```
 
 ---
@@ -89,38 +110,39 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Visit `http://localhost:5000` to access the student or admin login page.
+Visit `http://localhost:5000` to log in as a student or admin.
 
 ---
 
-## 🧪 Test Student Workflow
+## 🧪 Testing Tips
 
-1. Visit `/`
-2. Enter a valid student ID
-3. Take a pass → log stations using kiosk `/station_console`
+### Student
+
+* Log in as a student → check if assigned room is open
+* Request pass and return
+* Visit `/station_setup` to configure kiosk → test log IN/OUT
+
+### Admin
+
+* Log in via `/admin_login`
+* Approve/deny requests
+* Use override tool
+* View recent pass history
+* Export reports
 
 ---
 
-## 🧪 Test Admin Workflow
+## ✅ Recent Upgrades (v0.5)
 
-1. Visit `/admin_login`
-2. Use the credentials in `config.json`
-3. Create override passes, view active logs, export reports, etc.
-
----
-
-## 🚀 Next Steps for v0.5
-
-* [ ] Add live auto-refresh for admin panel
-* [ ] Track and report pass frequency by student
-* [ ] Audit CSV export
-* [ ] Role-based admin access (teacher vs main office)
-* [ ] Graphs/charts of weekly data
-* [ ] Optional kiosk PIN/QR login (instead of dropdown)
-* [ ] Package as `.exe` or Docker container
+* 🔁 Unified pending/active view with live auto-refresh
+* 🕒 Full pass lifecycle with IN/OUT timestamps and durations
+* 🧠 Room return auto-checkin and completion tracking
+* 📃 Final CSV export: ID, Name, Room Out/In, Station In/Out, Time
+* 📝 Notes persist through refresh
+* 📊 Weekly reports track override usage + long passes
 
 ---
 
 ## 📜 License
 
-MIT — modify freely and adapt to your school needs.
+MIT — Use, adapt, and deploy freely in your school or district.
