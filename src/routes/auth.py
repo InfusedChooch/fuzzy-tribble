@@ -1,4 +1,5 @@
-# routes/auth.py  🔄  fully patched
+# routes/auth.py
+
 from flask import (
     Blueprint, render_template, request, redirect,
     url_for, session, current_app
@@ -6,11 +7,21 @@ from flask import (
 from datetime import timedelta
 import json
 from src.utils import deactivate_room                     # keeps hallway map tidy
+from src.models import db, AuditLog
+from datetime import datetime
 
 auth_bp = Blueprint('auth', __name__)
 
 # ------------------------------------------------------------------
-# Config helper (shared pattern across routes)
+# Central audit logger
+# ------------------------------------------------------------------
+def log_audit(student_id, reason):
+    log = AuditLog(student_id=student_id, reason=reason, time=datetime.now())
+    db.session.add(log)
+    db.session.commit()
+
+# ------------------------------------------------------------------
+# Config helper
 # ------------------------------------------------------------------
 def load_config():
     try:
@@ -27,10 +38,6 @@ SESSION_TIMEOUT_MIN = config.get("session_timeout_minutes", 60)
 # ------------------------------------------------------------------
 @auth_bp.before_app_request
 def enforce_session_timeout():
-    """
-    Every request marks the session as 'permanent' so Flask’s built‑in
-    expiry mechanism kicks in. The lifetime is pulled from config.json.
-    """
     session.permanent = True
     current_app.permanent_session_lifetime = timedelta(
         minutes=SESSION_TIMEOUT_MIN
@@ -39,16 +46,13 @@ def enforce_session_timeout():
 # ------------------------------------------------------------------
 # Login
 # ------------------------------------------------------------------
-
 @auth_bp.route('/', methods=['GET', 'POST'])
 def login():
     from src.models import db, Student
     from src.utils import get_active_rooms
-    from flask import render_template, request, redirect, url_for, session
     import json
     from datetime import datetime
 
-    # Load config
     try:
         with open('data/config.json') as f:
             config = json.load(f)
@@ -95,11 +99,6 @@ def login():
 # ------------------------------------------------------------------
 @auth_bp.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
-    """
-    Simple username‑password gate for the admin interface.
-    •  Case‑insensitive username check
-    •  Optional redirect if already logged in
-    """
     if session.get("logged_in"):
         return redirect(url_for('admin.admin_view'))
 
@@ -115,6 +114,7 @@ def admin_login():
             session['role'] = 'admin'
             return redirect(url_for('admin.set_station'))
 
+        log_audit(username, "Failed admin login attempt.")
         return render_template(
             'admin_login.html',
             error='Incorrect username or password.'
@@ -122,19 +122,15 @@ def admin_login():
 
     return render_template('admin_login.html')
 
+
 # ------------------------------------------------------------------
 # Admin logout
 # ------------------------------------------------------------------
 @auth_bp.route('/admin_logout')
 def admin_logout():
-    """
-    Ends the current admin session and, if this console had been
-    registered as an active room/station, removes it from the list
-    so students can’t keep sending passes there.
-    """
     room = session.pop('admin_station', None)
     if room:
-        deactivate_room(room)                             # tidy active‑room list
+        deactivate_room(room)
 
     session.pop('logged_in', None)
     session.pop('role', None)

@@ -1,96 +1,134 @@
-# scripts/rebuild_db.py
-
-import os, sys, json
+import os
+import sys
+import json
+import shutil
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from src import create_app
+# ✅ Set project root and fix path
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, ROOT_DIR)
+
+print("sys.path:", sys.path)  # Debugging help
+
+from src.database import create_app
 from src.models import db, Student, Pass, AuditLog, PassLog
 
-app = create_app()
 
+# ──────────────────────────── paths ──────────────────────────────
+ROOT_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+SEED_DIR  = os.path.join(ROOT_DIR, "Seed")
+DATA_DIR  = os.path.join(ROOT_DIR, "data")
+DB_FILE   = os.path.join(DATA_DIR, "hallpass.db")
+PURGE_DIR = os.path.join(DATA_DIR, "purge")
+os.makedirs(PURGE_DIR, exist_ok=True)
+
+# allow `import src.*`
+sys.path.insert(0, ROOT_DIR)
+
+from src.database import create_app        # <-- your app factory
+from src.models   import db, Student, Pass, AuditLog, PassLog
+
+# ────────────────────── helper: archive and purge ────────────────
+def archive_existing_db():
+    if not os.path.isfile(DB_FILE):
+        print("ℹ️  No existing hallpass.db to archive.")
+        return
+
+    # purge backups older than 7 days
+    cutoff = datetime.now() - timedelta(days=7)
+    for fname in os.listdir(PURGE_DIR):
+        if fname.endswith(".db"):
+            fpath = os.path.join(PURGE_DIR, fname)
+            try:
+                if datetime.fromtimestamp(os.path.getmtime(fpath)) < cutoff:
+                    os.remove(fpath)
+                    print(f"🗑️  Removed old backup {fname}")
+            except Exception as e:
+                print(f"⚠️  Could not delete {fname}: {e}")
+
+    # move current DB → purge/YYYYMMDD_hallpass.db
+    tag  = datetime.now().strftime("%Y%m%d")
+    dest = os.path.join(PURGE_DIR, f"{tag}_hallpass.db")
+    try:
+        shutil.move(DB_FILE, dest)
+        print(f"🗃️  Archived previous DB → {dest}")
+    except PermissionError:
+        print("❌ hallpass.db is in use. Close all apps using it and rerun.")
+        sys.exit(1)
+
+# ──────────────────────── main rebuild ───────────────────────────
 def rebuild_database():
-    db_path = os.path.join("src", "data", "hallpass.db")
-    if os.path.exists(db_path):
-        os.remove(db_path)
-        print("🗑️  Old database deleted.")
+    archive_existing_db()
 
+    app = create_app()
     with app.app_context():
+        db.drop_all()
         db.create_all()
-        print("✅ New database created.")
+        print("✅ Fresh database created.")
 
-        # --- Load students ---
+        # ---------- students ----------
         try:
-            df = pd.read_csv("seed/masterlist.csv")
+            df = pd.read_csv(os.path.join(SEED_DIR, "masterlist.csv"))
             for _, row in df.iterrows():
-                schedule = json.loads(row['Schedule'])
-                student_id = str(row['ID']).strip()  # ✅ force string ID
-                print(f"Adding student: {student_id} - {row['Name']}")
-
-                student = Student(id=student_id, name=row['Name'], schedule=schedule)
-                db.session.add(student)
+                db.session.add(Student(
+                    id       = str(row["ID"]).strip(),
+                    name     = row["Name"],
+                    schedule = json.loads(row["Schedule"])
+                ))
             print(f"✅ Loaded {len(df)} students.")
         except Exception as e:
-            print(f"⚠️ Error loading students: {e}")
+            print(f"⚠️  Student load error: {e}")
 
-        # --- Load audit logs ---
+        # ---------- audit logs ----------
         try:
-            with open("seed/auditlog.json") as f:
-                audit_data = json.load(f)
-                for entry in audit_data:
-                    log = AuditLog(
-                        student_id = str(entry.get("student_id")),
-                        reason     = entry.get("reason"),
-                        time       = datetime.fromisoformat(entry["time"])
-                    )
-                    db.session.add(log)
-                print(f"✅ Loaded {len(audit_data)} audit logs.")
+            with open(os.path.join(SEED_DIR, "auditlog.json")) as f:
+                audits = json.load(f)
+            for a in audits:
+                db.session.add(AuditLog(
+                    student_id = str(a.get("student_id")),
+                    reason     = a["reason"],
+                    time       = datetime.fromisoformat(a["time"])
+                ))
+            print(f"✅ Loaded {len(audits)} audit entries.")
         except Exception as e:
-            print(f"⚠️ Error loading audit logs: {e}")
+            print(f"⚠️  Audit‑log load error: {e}")
 
-        # --- Load pass logs ---
+        # ---------- passes + logs ----------
         try:
-            with open("seed/passlog.json") as f:
-                pass_data = json.load(f)
-                for entry in pass_data:
-                    print("Loading pass entry:", entry.get("id", "N/A"))
-
-                    p = Pass(
-                        id              = entry["id"],
-                        student_id      = str(entry["student_id"]),  # ✅ ensure string
-                        date            = datetime.fromisoformat(entry["date"]).date(),
-                        period          = entry["period"],
-                        checkout_time   = datetime.strptime(entry["checkout_time"], "%H:%M:%S").time(),
-                        checkin_time    = datetime.strptime(entry["checkin_time"], "%H:%M:%S").time() if entry.get("checkin_time") else None,
-                        station          = entry.get("station"),
-                        total_pass_time = entry.get("total_pass_time", 0),
-                        note            = entry.get("note"),
-                        is_override     = entry.get("is_override", False),
-                        status          = entry.get("status", "returned")
-                    )
-                    db.session.add(p)
-
-                    logs = entry.get("logs") or []
-                    if isinstance(logs, str):
-                        print(f"⚠️ Skipping malformed logs in pass ID {entry['id']}: expected list, got string.")
-                        continue
-
-                    for log in logs:
-                        pl = PassLog(
-                            pass_id    = entry["id"],
+            with open(os.path.join(SEED_DIR, "passlog.json")) as f:
+                grouped = json.load(f)
+            pcount = 0
+            for stu_id, plist in grouped.items():
+                for p in plist:
+                    db.session.add(Pass(
+                        id              = p["id"],
+                        student_id      = stu_id,
+                        date            = datetime.fromisoformat(p["date"]).date(),
+                        period          = p["period"],
+                        checkout_time   = datetime.strptime(p["checkout_time"], "%H:%M:%S").time(),
+                        checkin_time    = datetime.strptime(p["checkin_time"], "%H:%M:%S").time() \
+                                            if p.get("checkin_time") else None,
+                        station         = p.get("station"),
+                        total_pass_time = p.get("total_pass_time", 0),
+                        note            = p.get("note"),
+                        is_override     = p.get("is_override", False),
+                        status          = p.get("status", "returned")
+                    ))
+                    for log in p.get("logs", []):
+                        db.session.add(PassLog(
+                            pass_id    = p["id"],
                             station    = log["station"],
                             event_type = log["event_type"],
                             timestamp  = datetime.fromisoformat(log["timestamp"])
-                        )
-                        db.session.add(pl)
-
-                print(f"✅ Loaded {len(pass_data)} passes and logs.")
+                        ))
+                    pcount += 1
+            print(f"✅ Loaded {pcount} passes.")
         except Exception as e:
-            print(f"⚠️ Error loading passes: {e}")
+            print(f"⚠️  Pass‑log load error: {e}")
 
         db.session.commit()
-        print("🎉 Database seed complete.")
+        print("🎉 Rebuild complete — data/hallpass.db ready.")
 
 if __name__ == "__main__":
     rebuild_database()

@@ -4,9 +4,14 @@ from threading import Thread
 from datetime import datetime, timezone
 import json, os, time
 
-app = create_app()
+_app = None
 
-# Cleanup inactive rooms thread
+def get_app():
+    global _app
+    if _app is None:
+        _app = create_app()
+    return _app
+
 def cleanup_inactive_rooms(interval=60, timeout=120):
     heartbeat_path = 'data/station_heartbeat.json'
     active_path = 'data/active_rooms.json'
@@ -41,7 +46,7 @@ def cleanup_inactive_rooms(interval=60, timeout=120):
 
         time.sleep(interval)
 
-Thread(target=cleanup_inactive_rooms, daemon=True).start()
-
 if __name__ == '__main__':
+    app = get_app()
+    Thread(target=cleanup_inactive_rooms, daemon=True).start()
     app.run(host='0.0.0.0', port=5000, debug=True)

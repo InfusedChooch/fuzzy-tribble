@@ -32,7 +32,7 @@ class Pass(db.Model):
 
 # --- Audit Log Table ---
 class AuditLog(db.Model):
-    __tablename__ = 'audit_logs'
+    __tablename__ = 'audit_log'
     id         = db.Column(db.Integer, primary_key=True, autoincrement=True)
     student_id = db.Column(db.String, db.ForeignKey('students.id'), nullable=True)
     time       = db.Column(db.DateTime, default=datetime.utcnow)

@@ -140,13 +140,21 @@ waitress-serve --port=5000 wsgi:app
 
 ---
 
-## 🔄 What's New in v0.6
+## 🔄 What's New in v0.6+
 
-* ✨ GUI Launcher
-* ↺ Live server console
-* 🔗 Clickable route list with preview
-* 🔍 Auto route discovery by file
-* 🎨 Custom window/taskbar icon
+* ✨ GUI Launcher with live stdout viewer
+* ↺ WSGI launch support via `waitress-serve`
+* 🔦 Option to launch `main.py` in a new terminal window
+* ❌ Current Limitation: `main.py` server **cannot be stopped** from within the launcher — must be manually terminated with `Ctrl+C` in the spawned terminal
+* 🛠️ Database creation delayed: `hallpass.db` is only created when the server is explicitly launched
+* 📆 Export logic uses `pandas` to extract and group `audit_log`, `students`, `passes`, and `pass_log` data
+* 📁 Rebuild workflow archives existing DB into `/data/purge/` and seeds new one from `/Seed/`
+
+To rebuild the DB cleanly:
+
+1. Close any open server
+2. Use "Rebuild Database" button in the launcher
+3. Then launch the server in your preferred mode
 
 ---
 

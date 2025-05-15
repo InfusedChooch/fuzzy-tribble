@@ -1,5 +1,6 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import inspect
 from src.models import db
 import os
 
@@ -8,18 +9,17 @@ def create_app():
     template_dir = os.path.join(base_dir, '..', 'templates')
     app = Flask(__name__, template_folder=template_dir)
 
-    app.secret_key = 'Duck_Goon_Slap00'  # or any secure random string
-
-    # Configure SQLite database path
+    app.secret_key = 'Duck_Goon_Slap00'
     db_path = os.path.join(base_dir, '..', 'data', 'hallpass.db')
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    # Initialize SQLAlchemy
     db.init_app(app)
 
-    # Create tables
     with app.app_context():
-        db.create_all()
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        if not all(tbl in tables for tbl in ['students', 'passes', 'audit_log', 'pass_log']):
+            db.create_all()
 
     return app

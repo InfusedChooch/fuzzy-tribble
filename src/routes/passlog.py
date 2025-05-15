@@ -80,7 +80,7 @@ def station_console():
                     ):
                         message = "Swipe already recorded."
                     else:
-                        # End immediately for override/no travel
+                        # ✅ Instant end for override/no travel
                         if (
                             new_event_type == "in" and
                             station.isdigit() and
@@ -112,6 +112,11 @@ def station_console():
                                 delta = datetime.combine(date.today(), active_pass.checkin_time) - \
                                         datetime.combine(date.today(), active_pass.checkout_time)
                                 active_pass.total_pass_time = int(delta.total_seconds())
+
+                                # ✅ Log correct station end
+                                from src.routes.core import log_audit
+                                log_audit(student.id, f"Pass ended by student at correct station {station}")
+
                                 active_pass.status = STATUS_RETURNED
                             else:
                                 active_pass.status = STATUS_ACTIVE

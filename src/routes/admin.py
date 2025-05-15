@@ -21,6 +21,13 @@ STATUS_PENDING_RETURN = "pending_return"
 STATUS_ACTIVE         = "active"
 STATUS_RETURNED       = "returned"
 
+
+# Central audit logger
+def log_audit(student_id, reason):
+    log = AuditLog(student_id=student_id, reason=reason, time=datetime.now())
+    db.session.add(log)
+    db.session.commit()
+
 # ──────────────────────────────────────────────────────────────────
 # Config helper
 # ──────────────────────────────────────────────────────────────────
@@ -292,6 +299,7 @@ def admin_add_note(student_id):
     if not p:
         return jsonify({'message': 'No active pass found.'})
 
+    log_audit(student_id, "Note updated on active pass.")
     p.note = note
     db.session.commit()
     return jsonify({'message': 'Note saved.'})

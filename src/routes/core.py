@@ -33,6 +33,14 @@ def get_current_period():
             return str(period)
     return "N/A"
 
+#Audit Log
+def log_audit(student_id, reason):
+    from src.models import db, AuditLog
+    from datetime import datetime
+    log = AuditLog(student_id=student_id, reason=reason, time=datetime.now())
+    db.session.add(log)
+    db.session.commit()
+
 @core_bp.route('/index')
 def index():
     if 'student_id' not in session:
@@ -56,6 +64,7 @@ def passroom_view(room):
 
     if scheduled_room != room:
         return render_template('login.html', error=f"You are not scheduled for Room {room} this period.")
+    log_audit(student.id, f"Attempted to access inactive room: {room}")
     if room not in get_active_rooms():
         return render_template('login.html', error=f"Room {room} is not active right now.")
 
