@@ -89,7 +89,7 @@ def login():
         current_room = student.schedule.get(current_period)
         if current_room not in get_active_rooms():
             return render_template('login.html', error=f"Room {current_room} is not accepting passes right now.")
-        return redirect(url_for('passroom_view', room=current_room))
+        return redirect(url_for('core.passroom_view', room=current_room))
 
     return render_template('login.html')
 

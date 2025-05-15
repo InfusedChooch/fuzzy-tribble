@@ -1,5 +1,11 @@
-Flask
-Flask-SQLAlchemy
-pandas
-waitress
-tkinterweb
+# ───── Core web stack ───────────────────────────────────────────
+Flask               # web framework
+Flask-SQLAlchemy    # ORM layer (pulls in SQLAlchemy & itsdangerous)
+
+# ───── Utility / data handling ─────────────────────────────────
+pandas              # CSV / JSON exports in launcher
+waitress            # production WSGI server
+tkinterweb          # in‑app HTML preview widget (optional but enabled in launcher)
+
+# ───── Packaging (optional) ────────────────────────────────────
+pyinstaller         # build single-file EXE:  pyinstaller --onefile launcher.py
