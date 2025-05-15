@@ -28,6 +28,12 @@ def log(msg):
 
 def browser(url): webbrowser.open_new_tab(url)
 
+
+#-------------------------------
+
+def get_exe_path(relative_path):
+    base = getattr(sys, '_MEIPASS', os.path.abspath("."))
+    return os.path.join(base, relative_path)
 # ────────────────────── server start/stop ──────────────────────
 def launch_server(mode, port, notebook):
     global server_process, current_mode

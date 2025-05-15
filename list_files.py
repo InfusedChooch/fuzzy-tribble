@@ -1,6 +1,6 @@
 import os
 
-EXCLUDED_DIRS = {"venv", "__pycache__", ".git", ".idea", ".vscode"}
+EXCLUDED_DIRS = {"venv", "__pycache__", ".git", ".idea", ".vscode","vendor"}
 
 def list_all_files(base_dir):
     for root, dirs, files in os.walk(base_dir):
@@ -12,3 +12,6 @@ def list_all_files(base_dir):
 
 if __name__ == "__main__":
     list_all_files(".")
+
+
+#python list_files.py > file_paths.md
