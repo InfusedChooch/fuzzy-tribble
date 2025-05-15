@@ -37,6 +37,60 @@ def enforce_session_timeout():
     )
 
 # ------------------------------------------------------------------
+# Login
+# ------------------------------------------------------------------
+
+@auth_bp.route('/', methods=['GET', 'POST'])
+def login():
+    from src.models import db, Student
+    from src.utils import get_active_rooms
+    from flask import render_template, request, redirect, url_for, session
+    import json
+    from datetime import datetime
+
+    # Load config
+    try:
+        with open('data/config.json') as f:
+            config = json.load(f)
+    except:
+        config = {}
+
+    def get_current_period():
+        now = datetime.now().time()
+        for period, times in config.get("period_schedule", {}).items():
+            start = datetime.strptime(times["start"], "%H:%M").time()
+            end = datetime.strptime(times["end"], "%H:%M").time()
+            if start <= now <= end:
+                return str(period)
+        return "N/A"
+
+    if session.get("logged_in"):
+        return redirect(url_for('admin.admin_view'))
+
+    if request.method == 'POST':
+        user = request.form['user'].strip()
+        admin_username = config.get("admin_username", "admin")
+
+        if user.lower() == admin_username.lower():
+            return redirect(url_for('auth.admin_login'))
+
+        student = db.session.get(Student, user)
+        if not student:
+            return render_template('login.html', error="ID not recognized.")
+
+        session['student_id'] = str(student.id)
+        session['role'] = 'student'
+
+        current_period = get_current_period()
+        current_room = student.schedule.get(current_period)
+        if current_room not in get_active_rooms():
+            return render_template('login.html', error=f"Room {current_room} is not accepting passes right now.")
+        return redirect(url_for('passroom_view', room=current_room))
+
+    return render_template('login.html')
+
+
+# ------------------------------------------------------------------
 # Admin login
 # ------------------------------------------------------------------
 @auth_bp.route('/admin_login', methods=['GET', 'POST'])

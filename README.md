@@ -1,10 +1,12 @@
-# Hall Pass Tracker (v0.5)
+# 🏢 Hall Pass Tracker (v0.6+ GUI Launcher Edition)
 
-A Flask-based digital hall pass system for managing student movement across rooms and stations. Built for school use with student-facing kiosks and a robust admin panel for live monitoring, overrides, logs, and reports.
+A Flask-based digital hall pass system for managing student movement across rooms and stations.
+Built for school use with student-facing kiosks and a robust admin panel for live monitoring, overrides, logs, and reports.
+Now includes a GUI launcher with route preview, log streaming, and dynamic server startup.
 
 ---
 
-## 🔧 Features (v0.5)
+## 🚀 Features (v0.6)
 
 ### ✅ Student Features
 
@@ -34,62 +36,52 @@ A Flask-based digital hall pass system for managing student movement across room
 * Assign current browser’s station ID (room or fixed station)
 * Upload/download student roster (CSV w/ JSON schedules)
 
----
+### 🔹 GUI Launcher (NEW)
 
-## 🛠 Station & Room Behavior
-
-* Stations like Bathroom/Nurse/Library are "fixed" and appear in a dropdown
-* All other numeric rooms (e.g., 101, 202) must be typed manually when opening a station
-* Station logs track IN → OUT events and automatically end the pass if returning to the original room
-* Total pass time = room checkout → check-in
-* Station time = difference between IN and OUT logs
-* Hallway time = total pass time – station time
+* Launch server via WSGI or `main.py`
+* Live popout console with server stdout/stderr
+* Clickable Local and LAN server links
+* Auto-discovers all routes and groups by file
+* Embedded browser preview for all GET routes
+* Uses `static/images/school_logo.png` as app/taskbar icon
 
 ---
 
-## 🧪 Pass Lifecycle (Request Flow)
-
-1. **Student login** ➔ redirect to their scheduled room
-2. **Request pass** ➔ mark as `pending_start`
-3. **Admin approves** ➔ pass becomes `active`
-4. **Student visits station** ➔ IN/OUT log created
-5. **Student clicks return** ➔ becomes `pending_return`
-6. **Admin approves** ➔ pass marked `returned` with timestamps + stats
-
----
-
-## 📂 Folder Structure
+## 📂 File Structure
 
 ```
 hall_pass_app/
-├── main.py                 # App entry and login routes
-├── config.json             # Admin credentials, station list, period schedule
+├── launcher.py              # GUI launcher
+├── main.py                 # App entry and background thread
+├── wsgi.py                 # WSGI server hook
+├── config.json             # Admin credentials, stations, schedule
 ├── /data/                  # JSON files for heartbeat, active rooms
 ├── /src/
 │   ├── models.py           # SQLAlchemy models
+│   ├── utils.py            # Periods and room activation
 │   └── routes/
-│       ├── admin.py        # Admin dashboard + reporting
 │       ├── auth.py         # Login/logout/session timeout
+│       ├── admin.py        # Admin dashboard + reporting
 │       ├── students.py     # Roster upload/download
 │       ├── passlog.py      # Station IN/OUT logic
-│       └── report.py       # Weekly and final CSV exports
-├── /templates/             # HTML views
-│   ├── index.html          # Student room view
-│   ├── admin.html          # Admin dashboard
-│   ├── login.html          # Initial login page
-│   ├── station.html        # Kiosk view (station_console)
-│   ├── station_setup.html  # Pick station for device
-│   └── others…
+│       ├── report.py       # Weekly and final CSV exports
+│       └── core.py         # Student-facing routes (index/passroom/debug)
+├── /templates/
+│   ├── login.html
+│   ├── admin.html
+│   ├── index.html
+│   ├── station.html
+│   └── station_setup.html
 └── /static/
-    ├── css/style.css       # Styling
+    ├── css/style.css
     └── js/
-        ├── index.js        # Student grid logic
-        └── admin.js        # Live updates & admin actions
+        ├── index.js
+        └── admin.js
 ```
 
 ---
 
-## ⚙️ Setup Instructions
+## 🚧 Setup Instructions
 
 ### 1. Create and Activate Virtual Environment
 
@@ -98,51 +90,66 @@ python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
 ```
 
-### 2. Install Dependencies
+### 2. Install Requirements
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Run the App
+### 3. Run the Launcher
+
+```bash
+python launcher.py
+```
+
+Or run manually:
 
 ```bash
 python main.py
+# or
+waitress-serve --port=5000 wsgi:app
 ```
 
-Visit `http://localhost:5000` to log in as a student or admin.
+---
+
+## 🧪 Pass Lifecycle
+
+1. **Student login** ➔ redirect to scheduled room
+2. **Request pass** ➔ marked `pending_start`
+3. **Admin approves** ➔ pass becomes `active`
+4. **Student logs station IN/OUT**
+5. **Student clicks return** ➔ `pending_return`
+6. **Admin approves** ➔ pass marked `returned` with logs
 
 ---
 
-## 🧪 Testing Tips
+## 💪 Testing Tips
 
-### Student
+### Students
 
-* Log in as a student → check if assigned room is open
-* Request pass and return
-* Visit `/station_setup` to configure kiosk → test log IN/OUT
+* Log in and verify assigned room access
+* Request pass and visit a kiosk
+* Return to original room
 
-### Admin
+### Admins
 
-* Log in via `/admin_login`
-* Approve/deny requests
-* Use override tool
-* View recent pass history
-* Export reports
-
----
-
-## ✅ Recent Upgrades (v0.5)
-
-* 🔁 Unified pending/active view with live auto-refresh
-* 🕒 Full pass lifecycle with IN/OUT timestamps and durations
-* 🧠 Room return auto-checkin and completion tracking
-* 📃 Final CSV export: ID, Name, Room Out/In, Station In/Out, Time
-* 📝 Notes persist through refresh
-* 📊 Weekly reports track override usage + long passes
+* Use `/admin_login` to access dashboard
+* Test overrides and notes
+* View history and export CSVs
+* Launch kiosk mode or view station live
 
 ---
 
-## 📜 License
+## 🔄 What's New in v0.6
 
-MIT — Use, adapt, and deploy freely in your school or district.
+* ✨ GUI Launcher
+* ↺ Live server console
+* 🔗 Clickable route list with preview
+* 🔍 Auto route discovery by file
+* 🎨 Custom window/taskbar icon
+
+---
+
+## 💼 License
+
+MIT — Free to use, modify, and deploy in educational settings.
