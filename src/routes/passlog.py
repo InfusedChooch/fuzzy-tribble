@@ -22,7 +22,10 @@ HEARTBEAT_FILE = os.path.join('data', 'station_heartbeat.json')
 def load_config():
     try:
         with open('data/config.json') as f:
-            return json.load(f)
+            config = json.load(f)
+            active = config.get("active_schedule", "regular")
+            config["period_schedule"] = config.get("schedule_variants", {}).get(active, {})
+            return config
     except Exception:
         return {}
 
