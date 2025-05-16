@@ -309,8 +309,10 @@ def render_rebuild_tab(notebook):
             conn = sqlite3.connect(db_path)
             pd.read_sql("SELECT * FROM audit_log", conn)\
                 .to_json(os.path.join(log_dir, f"{today}_audit.json"), orient="records", indent=2)
-            pd.read_sql("SELECT id,name,schedule FROM students", conn)\
-                .to_csv(os.path.join(log_dir, f"{today}_masterlist.csv"), index=False)
+            df_students = pd.read_sql("SELECT id, name, schedule FROM students", conn)
+            df_students.columns = ["ID", "Name", "Schedule"]  
+            df_students.to_csv(os.path.join(log_dir, f"{today}_masterlist.csv"), index=False)
+
             df_pass = pd.read_sql("SELECT * FROM passes", conn)
             df_log = pd.read_sql("SELECT * FROM pass_log", conn)
             grouped = {}
