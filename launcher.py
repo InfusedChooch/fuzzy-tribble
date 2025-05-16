@@ -8,40 +8,46 @@ from collections import defaultdict
 from importlib import import_module
 import contextlib
 
-# 1) include vendor in search path
+# ─── set‑up ────────────────────────────────────────────────────────────────
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "vendor"))
 
 IS_WINDOWS              = sys.platform.startswith("win")
 CREATE_NEW_PROCESS_GROUP = 0x00000200
+SERVER_EXE_NAME         = "hallpass_server.exe"
 
 server_process = None
 current_mode   = None
 console_text   = None
-status_var = None
-status_label = None
+status_var     = None
+status_label   = None
 
+# ─── helpers ───────────────────────────────────────────────────────────────
 def get_local_ip():
-    try:  return socket.gethostbyname(socket.gethostname())
-    except: return "Unavailable"
+    try:
+        return socket.gethostbyname(socket.gethostname())
+    except Exception:
+        return "Unavailable"
 
-def log(msg):
+def log(msg: str):
     if console_text:
         console_text.insert(tk.END, msg + "\n")
         console_text.see(tk.END)
 
-def browser(url): webbrowser.open_new_tab(url)
+def browser(url: str):
+    webbrowser.open_new_tab(url)
 
-def get_exe_path(relative_path):
-    base = getattr(sys, '_MEIPASS', os.path.abspath("."))
-    return os.path.join(base, relative_path)
+def get_exe_path(rel: str):
+    base = getattr(sys, "_MEIPASS", os.path.abspath("."))
+    return os.path.join(base, rel)
 
-def launch_server(mode, port, notebook):
+# ─── launch / stop ─────────────────────────────────────────────────────────
+def launch_server(mode: str, port: str, notebook):
+    """Spin up the dev server (main.py) or production server (Waitress / EXE)."""
     global server_process, current_mode
 
     if console_text is None:
         messagebox.showerror("Console Not Ready", "Please wait for the GUI to load before launching.")
         return
-
     if server_process and server_process.poll() is None:
         messagebox.showinfo("Already running", "A server is already running.")
         return
@@ -50,23 +56,25 @@ def launch_server(mode, port, notebook):
     log(f"Launching {mode.upper()} on port {port}…")
 
     base = os.path.dirname(__file__)
-    vpy = sys.executable
-    wsgi = shutil.which("waitress-serve")
+    vpy  = sys.executable                      # current Python interpreter
+    bundled_srv = os.path.join(os.path.dirname(sys.executable), SERVER_EXE_NAME)
 
-    if not os.path.exists(vpy):
-        log(f"❌ Python interpreter not found: {vpy}")
-        return
+    if os.path.exists(bundled_srv):  # ✅ dev or EXE
+        cmd = [bundled_srv, f"--port={port}"]
+    else:
+        if mode == "main":
+            cmd = [vpy, "-u", os.path.join(base, "main.py")]
+        else:
+            wsgi_cli = shutil.which("waitress-serve")
+            if not wsgi_cli:
+                log("❌ waitress-serve not found. Install Waitress or bundle hallpass_server.exe.")
+                return
+            cmd = [wsgi_cli, "--call", f"--port={port}", "wsgi:get_app"]
 
-    if not wsgi:
-        log("❌ waitress-serve not found. Is it installed in your environment?")
-        return
-
-    cmd = ([vpy, "-u", os.path.join(base, "main.py")] if mode == "main"
-           else [wsgi, "--call", f"--port={port}", "wsgi:get_app"])
     flags = CREATE_NEW_PROCESS_GROUP if (mode == "main" and IS_WINDOWS) else 0
 
     def stream():
-        global server_process
+        global server_process, current_mode
         try:
             server_process = subprocess.Popen(
                 cmd,
@@ -79,13 +87,12 @@ def launch_server(mode, port, notebook):
             current_mode = mode
             for line in server_process.stdout:
                 log(line.rstrip())
-        except Exception as e:
-            log(f"❌ Launch error: {e}")
+        except Exception as exc:
+            log(f"❌ Launch error: {exc}")
             server_process = None
-            current_mode = None
+            current_mode   = None
 
     threading.Thread(target=stream, daemon=True).start()
-
 
 def stop_server():
     global server_process, current_mode
@@ -107,17 +114,17 @@ def stop_server():
 
         server_process.wait(timeout=5)
         log("✅ Server stopped.")
-    except Exception as e:
-        log(f"⚠️ {e} – trying kill()")
+    except Exception as exc:
+        log(f"⚠️ {exc} – trying kill()")
         try:
             server_process.kill()
             server_process.wait(timeout=5)
             log("💥 Killed.")
-        except Exception as k:
-            log(f"❌ kill() failed: {k}")
+        except Exception as kexc:
+            log(f"❌ kill() failed: {kexc}")
     finally:
         server_process = None
-        current_mode = None
+        current_mode   = None
 
 
 def create_routes_tab(notebook, port_var):

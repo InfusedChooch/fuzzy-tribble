@@ -1,3 +1,4 @@
+// admin.js
 let passTimers = {};
 
 /* ----------------------------------------------------------
@@ -8,7 +9,7 @@ function loadPasses() {
   if (!tbody) return;
 
   // 📝 Preserve note input values before refresh
-  let currentNotes = {};
+  const currentNotes = {};
   document.querySelectorAll('[id^="note-"]').forEach(input => {
     const passId = input.id.split('-')[1];
     currentNotes[passId] = input.value;
@@ -24,9 +25,7 @@ function loadPasses() {
         const row = tbody.insertRow();
         row.className = p.status;
 
-        const statusLabel = (p.status === 'pending_return') ? '🟡 Pending Stop' : '';
-
-        const actionHtml = (p.status === 'pending_start')
+        const actionHtml = p.status === 'pending_start'
           ? `<button onclick="approve(${p.pass_id})">Approve</button>
              <button onclick="reject(${p.pass_id})">Reject</button>`
           : `<button onclick="manualCheckIn(${p.pass_id})">End Pass</button>`;
@@ -48,24 +47,27 @@ function loadPasses() {
             <input type="text" id="note-${p.pass_id}" value="${p.note || ''}" placeholder="Add note">
             <button onclick="addNote('${p.student_id}', '${p.pass_id}')">Save</button>
           </td>
-          <td>${statusLabel} ${p.is_override ? '✔️' : ''}</td>
+          <td>${p.is_override ? '✔️ Override' : ''}</td>
         `;
 
-        // 📝 Restore previous note input after refresh
+        // Restore notes
         const noteInput = document.getElementById(`note-${p.pass_id}`);
         if (noteInput && currentNotes[p.pass_id] !== undefined) {
           noteInput.value = currentNotes[p.pass_id];
         }
 
         if (p.status === 'active' && p.room_time && p.room_time.includes('@')) {
-          const timePart = p.room_time.split('@')[1].trim();
-          const parts = timePart.split(':').map(Number);
-          passTimers[p.pass_id] = parts;
+          const [, timePart] = p.room_time.split('@');
+          const [h, m, s] = timePart.trim().split(':').map(Number);
+          passTimers[p.pass_id] = [h, m, s];
         }
       });
     });
 }
 
+/* ----------------------------------------------------------
+   Load / refresh pending-pass table
+---------------------------------------------------------- */
 function loadPendingPasses() {
   const tbody = document.getElementById('pending-table');
   if (!tbody) return;
@@ -78,7 +80,7 @@ function loadPendingPasses() {
         const row = tbody.insertRow();
         row.className = p.status;
 
-        const actionCell = (p.status === 'pending_start')
+        const actionCell = p.status === 'pending_start'
           ? `<button onclick="approve(${p.pass_id})">Approve</button>
              <button onclick="reject(${p.pass_id})">Reject</button>`
           : `<button onclick="manualCheckIn(${p.pass_id})">End Pass</button>`;
@@ -89,26 +91,21 @@ function loadPendingPasses() {
           <td>${p.room}</td>
           <td>${p.time}</td>
           <td>${p.status === 'pending_start' ? 'Start' : 'Stop'}</td>
-          <td>
-            ${p.status === 'pending_start'
-              ? `<button onclick="approve(${p.pass_id})">Approve</button>
-                <button onclick="reject(${p.pass_id})">Reject</button>`
-              : `<button onclick="manualCheckIn(${p.pass_id})">End Pass</button>`}
-          </td>
+          <td>${actionCell}</td>
         `;
       });
     });
 }
 
 /* ----------------------------------------------------------
-   Timer tick updater
+   Timer updates for station/room durations
 ---------------------------------------------------------- */
 function updateTimers() {
   const now = new Date();
-  Object.entries(passTimers).forEach(([passId, parts]) => {
-    const t0 = new Date();
-    t0.setHours(parts[0], parts[1], parts[2], 0);
-    let diff = Math.floor((now - t0) / 1000);
+  Object.entries(passTimers).forEach(([passId, [h, m, s]]) => {
+    const start = new Date();
+    start.setHours(h, m, s, 0);
+    let diff = Math.floor((now - start) / 1000);
     diff = Math.max(diff, 0);
     const minutes = Math.floor(diff / 60);
     const seconds = diff % 60;
@@ -118,7 +115,7 @@ function updateTimers() {
 }
 
 /* ----------------------------------------------------------
-   Admin actions
+   Admin actions: approve, reject, manual check-in
 ---------------------------------------------------------- */
 function manualCheckIn(passId) {
   fetch(`/admin_checkin/${passId}`, { method: 'POST' })
@@ -164,25 +161,15 @@ function addNote(studentId, passId) {
 /* ----------------------------------------------------------
    Create override pass
 ---------------------------------------------------------- */
-/* ----------------------------------------------------------
-   Create override pass
----------------------------------------------------------- */
 document.getElementById('create-pass-form')?.addEventListener('submit', function (e) {
   e.preventDefault();
   const studentId = document.getElementById('student_id').value.trim();
-  const roomOut = document.getElementById('override_room')?.value.trim();  // 🆕 new field
-  const period = document.getElementById('override_period')?.value.trim(); // optional fallback
+  const roomOut = document.getElementById('override_room')?.value.trim();
+  const period = document.getElementById('override_period')?.value.trim();
 
-  const payload = {
-    student_id: studentId
-  };
-
-  if (roomOut) {
-    payload.room = roomOut;
-  }
-  if (period) {
-    payload.period = period;
-  }
+  const payload = { student_id: studentId };
+  if (roomOut) payload.room = roomOut;
+  if (period) payload.period = period;
 
   fetch('/admin_create_pass', {
     method: 'POST',
@@ -209,11 +196,7 @@ document.getElementById('change-password-form')?.addEventListener('submit', func
   fetch('/admin_change_password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      current_password: currentPass,
-      new_password: newPass,
-      confirm_password: confirmPass
-    })
+    body: JSON.stringify({ current_password: currentPass, new_password: newPass, confirm_password: confirmPass })
   })
     .then(res => res.json())
     .then(data => {
@@ -221,17 +204,6 @@ document.getElementById('change-password-form')?.addEventListener('submit', func
       if (data.success) this.reset();
     });
 });
-
-/* ----------------------------------------------------------
-   Smart refresh for new pending alerts (silent)
----------------------------------------------------------- */
-function checkForPendingChanges() {
-  fetch('/admin_pending_count')
-    .then(res => res.json())
-    .then(data => {
-      // Silent refresh only
-    });
-}
 
 /* ----------------------------------------------------------
    Open popout station view
@@ -245,14 +217,14 @@ function openStationView(event) {
 }
 
 /* ----------------------------------------------------------
-   Collapsible section memory + toggle all
+   Collapsible sections + toggle all
 ---------------------------------------------------------- */
 document.addEventListener("DOMContentLoaded", () => {
   const toggleAllBtn = document.getElementById("toggle-all");
   const collapsibles = Array.from(document.querySelectorAll(".collapsible"));
 
-  collapsibles.forEach((btn, index) => {
-    const key = `collapsible-${index}`;
+  collapsibles.forEach((btn, idx) => {
+    const key = `collapsible-${idx}`;
     const content = btn.nextElementSibling;
     const saved = localStorage.getItem(key);
     content.style.display = saved === "none" ? "none" : "block";
@@ -264,19 +236,17 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  if (toggleAllBtn) {
-    toggleAllBtn.addEventListener("click", () => {
-      const anyOpen = collapsibles.some(btn => btn.nextElementSibling.style.display !== "none");
-      collapsibles.forEach((btn, index) => {
-        const key = `collapsible-${index}`;
-        const content = btn.nextElementSibling;
-        const newState = anyOpen ? "none" : "block";
-        content.style.display = newState;
-        localStorage.setItem(key, newState);
-      });
-      toggleAllBtn.textContent = anyOpen ? "🔼 Expand All" : "🔽 Collapse All";
+  toggleAllBtn?.addEventListener("click", () => {
+    const anyOpen = collapsibles.some(btn => btn.nextElementSibling.style.display !== "none");
+    collapsibles.forEach((btn, idx) => {
+      const key = `collapsible-${idx}`;
+      const content = btn.nextElementSibling;
+      const newState = anyOpen ? "none" : "block";
+      content.style.display = newState;
+      localStorage.setItem(key, newState);
     });
-  }
+    toggleAllBtn.textContent = anyOpen ? "🔼 Expand All" : "🔽 Collapse All";
+  });
 });
 
 /* ----------------------------------------------------------
@@ -284,7 +254,6 @@ document.addEventListener("DOMContentLoaded", () => {
 ---------------------------------------------------------- */
 setInterval(updateTimers, 1000);
 setInterval(loadPasses, 5000);
-setInterval(checkForPendingChanges, 10000);
 setInterval(loadPendingPasses, 5000);
 loadPendingPasses();
 loadPasses();

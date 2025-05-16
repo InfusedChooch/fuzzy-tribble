@@ -50,12 +50,7 @@ def station_console():
 
     station = session['station_id']
 
-    # 🚫 If the station has been closed, block kiosk access
-    from src.utils import get_active_rooms
-    if station not in get_active_rooms():
-        session.pop('station_id', None)
-        return render_template("station.html", station=None, message="⛔ This station is no longer active.")
-
+    # ✅ Always activate when console is opened (removed gatecheck)
     activate_room(station)
 
     special_stations = set(config.get('stations', ["Bathroom", "Nurse", "Library", "Office"]))
