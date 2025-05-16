@@ -20,6 +20,7 @@ current_mode   = None
 console_text   = None
 status_var     = None
 status_label   = None
+server_pid     = None
 
 # ─── helpers ───────────────────────────────────────────────────────────────
 def get_local_ip():
@@ -42,8 +43,7 @@ def get_exe_path(rel: str):
 
 # ─── launch / stop ─────────────────────────────────────────────────────────
 def launch_server(mode: str, port: str, notebook):
-    """Spin up the dev server (main.py) or production server (Waitress / EXE)."""
-    global server_process, current_mode
+    global server_process, current_mode, server_pid
 
     if console_text is None:
         messagebox.showerror("Console Not Ready", "Please wait for the GUI to load before launching.")
@@ -56,10 +56,10 @@ def launch_server(mode: str, port: str, notebook):
     log(f"Launching {mode.upper()} on port {port}…")
 
     base = os.path.dirname(__file__)
-    vpy  = sys.executable                      # current Python interpreter
+    vpy  = sys.executable
     bundled_srv = os.path.join(os.path.dirname(sys.executable), SERVER_EXE_NAME)
 
-    if os.path.exists(bundled_srv):  # ✅ dev or EXE
+    if os.path.exists(bundled_srv):  # EXE version
         cmd = [bundled_srv, f"--port={port}"]
     else:
         if mode == "main":
@@ -74,7 +74,7 @@ def launch_server(mode: str, port: str, notebook):
     flags = CREATE_NEW_PROCESS_GROUP if (mode == "main" and IS_WINDOWS) else 0
 
     def stream():
-        global server_process, current_mode
+        global server_process, current_mode, server_pid
         try:
             server_process = subprocess.Popen(
                 cmd,
@@ -85,17 +85,19 @@ def launch_server(mode: str, port: str, notebook):
                 creationflags=flags
             )
             current_mode = mode
+            server_pid = server_process.pid
             for line in server_process.stdout:
                 log(line.rstrip())
         except Exception as exc:
             log(f"❌ Launch error: {exc}")
             server_process = None
             current_mode   = None
+            server_pid     = None
 
     threading.Thread(target=stream, daemon=True).start()
 
 def stop_server():
-    global server_process, current_mode
+    global server_process, current_mode, server_pid
     if not server_process:
         log("ℹ️ No server running.")
         return
@@ -125,6 +127,7 @@ def stop_server():
     finally:
         server_process = None
         current_mode   = None
+        server_pid     = None
 
 
 def create_routes_tab(notebook, port_var):
