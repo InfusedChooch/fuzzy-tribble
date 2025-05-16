@@ -53,7 +53,38 @@ document.getElementById('check-form')?.addEventListener('submit', function(e) {
   });
 });
 
-setInterval(updateClock, 1000);
-setInterval(refreshPasses, 5000);
-updateClock();
-refreshPasses();
+export function updateCustomClock() {
+  const now = new Date();
+  const weekday = now.toLocaleDateString(undefined, { weekday: 'long' });
+  const date = now.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+  const time = now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+  const clockEl = document.getElementById("custom-clock");
+  if (clockEl) {
+    clockEl.textContent = `${weekday}, ${date} ${time.toLowerCase()}`;
+  }
+}
+
+export function updatePeriod() {
+  fetch("/debug_period")
+    .then(res => res.json())
+    .then(data => {
+      let current = null;
+      if (Array.isArray(data)) current = data.find(p => p.match);
+      else if (data.match) current = data;
+
+      const periodEl = document.getElementById("period");
+      if (periodEl) {
+        periodEl.textContent = current
+          ? `Current Period: ${current.period}`
+          : "Outside scheduled periods";
+      }
+    });
+}
+
+// ✅ Ensure DOM is ready before running clock + period logic
+document.addEventListener("DOMContentLoaded", () => {
+  updateCustomClock();
+  updatePeriod();
+  setInterval(updateCustomClock, 1000);
+  setInterval(updatePeriod, 30000);
+});

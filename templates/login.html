@@ -2,63 +2,28 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>Hall Pass Login</title>
-    <style>
-        body { font-family: sans-serif; text-align: center; padding: 2em; }
-        form { display: inline-block; text-align: left; }
-        input { display: block; margin: 1em 0; padding: 0.5em; width: 250px; }
-        button { padding: 0.5em 1em; }
-        .error { color: red; margin-top: 1em; }
-        .clock, .period {
-            font-size: 1.2em;
-            margin: 0.5em;
-            color: #333;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Hall Pass Login</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/icon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <h1>Hall Pass Login</h1>
+  <h1>Hall Pass Login</h1>
 
-    <div class="clock" id="clock">Loading time...</div>
-    <div class="period" id="period">Checking current period...</div>
+  <!-- Shared styled clock + period -->
+  <div id="custom-clock" class="custom-clock">Loading time…</div>
+  <div class="period" id="period">Checking current period...</div>
 
-        <form method="POST">
-            <div><label>Enter Student ID:</label><div>
-            <input type="text" name="user" required>
-            <button type="submit">Continue</button>
-        </form>
+  <form method="POST">
+    <div><label>Enter Student ID:</label><div>
+    <input type="text" name="user" required>
+    <button type="submit">Continue</button>
+  </form>
 
-    {% if error %}
-        <div class="error">{{ error }}</div>
-    {% endif %}
+  {% if error %}
+    <div class="error">{{ error }}</div>
+  {% endif %}
 
-    <script>
-    function updateClock() {
-        const now = new Date();
-        let h = now.getHours(),
-            m = now.getMinutes(),
-            s = now.getSeconds();
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        h = h % 12 || 12;
-        document.getElementById('clock').textContent =
-            `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')} ${ampm}`;
-    }
-
-    function updatePeriod() {
-        fetch("/debug_period")
-            .then(res => res.json())
-            .then(data => {
-                const current = data.find(p => p.match);
-                document.getElementById('period').textContent =
-                    current ? `Current Period: ${current.period}` : "Outside scheduled periods";
-            });
-    }
-
-    setInterval(updateClock, 1000);
-    setInterval(updatePeriod, 30000);
-    updateClock();
-    updatePeriod();
-    </script>
+  <script type="module" src="{{ url_for('static', filename='js/index.js') }}"></script>
 </body>
 </html>

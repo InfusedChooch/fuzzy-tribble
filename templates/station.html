@@ -4,24 +4,8 @@
 <head>
   <meta charset="UTF-8" />
   <title>Station Kiosk — {{ station }}</title>
-  <style>
-    body { font-family:sans-serif; text-align:center; padding:2em; }
-    form { margin:2em auto; }
-    input { padding:0.6em 1em; width:220px; }
-    button { padding:0.6em 1.2em; }
-    .message { color:red; margin:1em; font-weight:bold; }
-    .passes { display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; margin-top: 20px; }
-    .pass-box {
-      width: 160px; height: 160px; border: 3px solid #333; border-radius: 10px;
-      display: flex; flex-direction: column; justify-content: center; align-items: center;
-      font-size: 1.2em; background-color: #fff;
-    }
-    .pass-box.pending_start  { background-color: #cfe2ff; }
-    .pass-box.pending_return { background-color: #ffedc7; }
-    .pass-box.active         { background-color: #ffd6d6; }
-    .pass-box.free           { background-color: #dfffdf; }
-    .symbol { font-size: 2em; margin-bottom: 0.5em; }
-  </style>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/icon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
   <h1>{{ station }} Station</h1>
@@ -34,47 +18,53 @@
     <button type="submit">Submit</button>
   </form>
 
-<div class="clock" id="kiosk-clock" style="font-size: 2.5em; margin: 2em 0;"></div>
-
+  <!-- Shared styled clock + period -->
+  <div id="custom-clock" class="custom-clock">Loading time…</div>
+  <div class="period" id="period">Checking current period...</div>
 
   <hr>
   <button onclick="promptCloseStation()">🔒 Close This Station</button>
 
   <script>
-  function promptCloseStation() {
-    const password = prompt("Enter admin password to close this station:");
-    if (!password) return;
+    function promptCloseStation() {
+      const password = prompt("Enter admin password to close this station:");
+      if (!password) return;
 
-    fetch("/close_station", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password })
-    })
-      .then(res => res.json())
-      .then(data => {
-        alert(data.message);
-        if (data.message.includes("closed")) {
-          window.location.href = "/station_setup";
-        }
-      });
-  }
+      fetch("/close_station", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password })
+      })
+        .then(res => res.json())
+        .then(data => {
+          alert(data.message);
+          if (data.message.includes("closed")) {
+            window.location.href = "/";
+          }
+        });
+    }
+
+    // Heartbeat ping
+    setInterval(() => {
+      fetch("/station_heartbeat", { method: "POST" });
+    }, 30000);
+
+    // Auto-close if deactivated
+    setInterval(() => {
+      const currentStation = "{{ station }}";
+      if (!currentStation) return;
+
+      fetch("/debug/active_rooms")
+        .then(res => res.json())
+        .then(activeRooms => {
+          if (!activeRooms.includes(currentStation)) {
+            alert("⛔ This station has been closed by admin.");
+            window.location.href = "/";
+          }
+        });
+    }, 30000);
   </script>
-  <script>
-setInterval(() => {
-  fetch("/station_heartbeat", { method: "POST" });
-}, 30000); // every 30 seconds
-</script>
 
-<script>
-  function updateKioskClock() {
-    const now = new Date();
-    const h = String(now.getHours()).padStart(2, '0');
-    const m = String(now.getMinutes()).padStart(2, '0');
-    const s = String(now.getSeconds()).padStart(2, '0');
-    document.getElementById('kiosk-clock').textContent = `${h}:${m}:${s}`;
-  }
-  setInterval(updateKioskClock, 1000);
-  updateKioskClock();
-</script>
+  <script type="module" src="{{ url_for('static', filename='js/index.js') }}"></script>
 </body>
 </html>

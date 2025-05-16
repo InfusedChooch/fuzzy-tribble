@@ -7,6 +7,7 @@ from src.utils import get_active_rooms
 import json, os
 
 core_bp = Blueprint('core', __name__)
+ping_bp = Blueprint('ping', __name__)
 
 STATUS_PENDING_START  = "pending_start"
 STATUS_PENDING_RETURN = "pending_return"
@@ -52,9 +53,17 @@ def index():
     student = db.session.get(Student, session['student_id'])
     current_period = get_current_period()
     current_room = student.schedule.get(current_period)
-    if current_room not in get_active_rooms():
+
+    # Optional debug statements
+    print("DEBUG — Period:", current_period)
+    print("DEBUG — Room from schedule:", repr(current_room))
+    print("DEBUG — Active rooms:", get_active_rooms())
+
+    if not current_room or current_room.strip() not in get_active_rooms():
         return render_template("login.html", error=f"Room {current_room} is not accepting passes right now.")
-    return redirect(url_for('core.passroom_view', room=current_room))
+
+    return redirect(url_for('core.passroom_view', room=current_room.strip()))
+
 
 @core_bp.route('/passroom/<room>', methods=['GET', 'POST'])
 def passroom_view(room):
@@ -104,7 +113,10 @@ def passroom_view(room):
         date=datetime.now().date(),
         period=current_period,
         station=room
-    ).filter(Pass.checkin_time == None).order_by(Pass.checkout_time).all()
+    ).filter(
+        Pass.checkin_time == None,
+        Pass.is_override == False  # 🔁 Ignore override passes for display limit
+    ).order_by(Pass.checkout_time).all()
 
     display_passes = [{
         "student_name": p.student.name if p.student else None,
@@ -157,3 +169,7 @@ def debug_active_rooms():
 def debug_students():
     students = Student.query.all()
     return jsonify([{ "id": s.id, "type": str(type(s.id)) } for s in students])
+
+@ping_bp.route('/ping')
+def ping():
+    return "pong", 200

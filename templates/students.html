@@ -4,12 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Manage Students</title>
-  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/school_logo.png') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/icon.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
   <header>
     <h1>Student Roster</h1>
+
+    <!-- Unified clock + period -->
+    <div id="custom-clock" class="custom-clock">Loading time…</div>
+    <div class="period" id="period">Checking current period...</div>
+
     <nav>
       <a href="{{ url_for('admin.admin_view') }}">← Back to Admin Panel</a>
     </nav>
@@ -56,5 +61,7 @@
       <button type="submit">Add Student</button>
     </form>
   </section>
+
+  <script type="module" src="{{ url_for('static', filename='js/index.js') }}"></script>
 </body>
 </html>

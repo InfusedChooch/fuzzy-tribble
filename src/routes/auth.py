@@ -4,11 +4,10 @@ from flask import (
     Blueprint, render_template, request, redirect,
     url_for, session, current_app
 )
-from datetime import timedelta
+from datetime import timedelta, datetime
 import json
-from src.utils import deactivate_room                     # keeps hallway map tidy
-from src.models import db, AuditLog
-from datetime import datetime
+from src.utils import deactivate_room, get_active_rooms
+from src.models import db, AuditLog, Student
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -51,17 +50,6 @@ def enforce_session_timeout():
 # ------------------------------------------------------------------
 @auth_bp.route('/', methods=['GET', 'POST'])
 def login():
-    from src.models import db, Student
-    from src.utils import get_active_rooms
-    import json
-    from datetime import datetime
-
-    try:
-        with open('data/config.json') as f:
-            config = json.load(f)
-    except:
-        config = {}
-
     def get_current_period():
         now = datetime.now().time()
         for period, times in config.get("period_schedule", {}).items():
@@ -90,12 +78,18 @@ def login():
 
         current_period = get_current_period()
         current_room = student.schedule.get(current_period)
-        if current_room not in get_active_rooms():
+
+        # Debug output
+        print("DEBUG — Period:", current_period)
+        print("DEBUG — Room from schedule:", repr(current_room))
+        print("DEBUG — Active rooms:", get_active_rooms())
+
+        if not current_room or current_room.strip() not in get_active_rooms():
             return render_template('login.html', error=f"Room {current_room} is not accepting passes right now.")
-        return redirect(url_for('core.passroom_view', room=current_room))
+
+        return redirect(url_for('core.passroom_view', room=current_room.strip()))
 
     return render_template('login.html')
-
 
 # ------------------------------------------------------------------
 # Admin login
@@ -115,7 +109,7 @@ def admin_login():
         ):
             session['logged_in'] = True
             session['role'] = 'admin'
-            return redirect(url_for('admin.set_station'))
+        return redirect(url_for('admin.admin_view'))
 
         log_audit(username, "Failed admin login attempt.")
         return render_template(
@@ -124,7 +118,6 @@ def admin_login():
         )
 
     return render_template('admin_login.html')
-
 
 # ------------------------------------------------------------------
 # Admin logout

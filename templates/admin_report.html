@@ -4,14 +4,16 @@
 <head>
   <meta charset="UTF-8" />
   <title>Weekly Hall‑Pass Report</title>
-  <style>
-    body { font-family:sans-serif; padding:2em; }
-    table { width:100%; border-collapse:collapse; margin-top:2em; }
-    th,td { border:1px solid #ccc; padding:0.4em 0.6em; text-align:center; }
-  </style>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/icon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
   <h1>Weekly Hall‑Pass Summary</h1>
+
+  <!-- Unified clock + period -->
+  <div id="custom-clock" class="custom-clock">Loading time…</div>
+  <div class="period" id="period">Checking current period...</div>
+
   <nav>
     <a href="{{ url_for('admin.admin_view') }}">← Back to Admin</a> |
     <a href="{{ url_for('report.admin_report_csv') }}">Download CSV</a>
@@ -41,5 +43,7 @@
       {% endfor %}
     </tbody>
   </table>
+
+  <script type="module" src="{{ url_for('static', filename='js/index.js') }}"></script>
 </body>
 </html>

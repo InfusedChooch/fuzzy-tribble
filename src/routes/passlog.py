@@ -46,9 +46,16 @@ def get_current_period():
 @passlog_bp.route('/station_console', methods=['GET', 'POST'])
 def station_console():
     if 'station_id' not in session:
-        return redirect(url_for('passlog.station_setup'))
+        return "⛔ Station not set. Please launch from the admin panel.", 403
 
     station = session['station_id']
+
+    # 🚫 If the station has been closed, block kiosk access
+    from src.utils import get_active_rooms
+    if station not in get_active_rooms():
+        session.pop('station_id', None)
+        return render_template("station.html", station=None, message="⛔ This station is no longer active.")
+
     activate_room(station)
 
     special_stations = set(config.get('stations', ["Bathroom", "Nurse", "Library", "Office"]))
@@ -116,7 +123,6 @@ def station_console():
                                         datetime.combine(date.today(), active_pass.checkout_time)
                                 active_pass.total_pass_time = int(delta.total_seconds())
 
-                                # ✅ Log correct station end
                                 from src.routes.core import log_audit
                                 log_audit(student.id, f"Pass ended by student at correct station {station}")
 
@@ -126,24 +132,35 @@ def station_console():
 
                             db.session.commit()
                             message = f"{student.name} {new_event_type} recorded at {station}."
-
             else:
                 if station.isdigit():
-                    new_pass = Pass(
-                        student_id=student.id,
+                    # ✅ Enforce max passes rule
+                    max_passes = config.get("passes_available", 2)
+                    active_count = Pass.query.filter_by(
                         date=datetime.now().date(),
                         period=current_period,
-                        checkout_time=datetime.now().time(),
-                        station=station,
-                        status=STATUS_ACTIVE
-                    )
-                    db.session.add(new_pass)
-                    db.session.commit()
-                    message = f"{student.name} checked out from Room {station}."
+                        station=station
+                    ).filter(Pass.checkin_time == None).count()
+
+                    if active_count >= max_passes:
+                        message = f"Max passes reached for Room {station}."
+                    else:
+                        new_pass = Pass(
+                            student_id=student.id,
+                            date=datetime.now().date(),
+                            period=current_period,
+                            checkout_time=datetime.now().time(),
+                            station=station,
+                            status=STATUS_ACTIVE
+                        )
+                        db.session.add(new_pass)
+                        db.session.commit()
+                        message = f"{student.name} checked out from Room {station}."
                 else:
                     message = "You don’t have an active pass to use this station."
 
     return render_template('station.html', station=station, passes=[], message=message)
+
 
 # ------------------------------------------------------------------
 # Heartbeat updater (station pings every 30s)
@@ -186,7 +203,9 @@ def close_station():
 
     station = session['station_id']
     deactivate_room(station)
-    return jsonify({'message': f'{station} has been closed.'})
+    session.pop('station_id', None)
+    return redirect(url_for('auth.login'))
+
 
 # ------------------------------------------------------------------
 # Public view for hallway TVs etc.
@@ -199,15 +218,15 @@ def popout_station_view(station_name):
 # ------------------------------------------------------------------
 # Dropdown for setting station (station_setup.html)
 # ------------------------------------------------------------------
-@passlog_bp.route('/station_setup', methods=['GET', 'POST'])
-def station_setup():
-    rooms = sorted({str(r) for r in range(100, 281)})
-    rooms.extend(config.get('stations', []))
-    rooms = sorted(set(rooms))
-
-    if request.method == 'POST':
-        selected = request.form.get('station')
-        session['station_id'] = selected
-        return redirect(url_for('passlog.station_console'))
-
-    return render_template('station_setup.html', rooms=rooms)
+#@passlog_bp.route('/station_setup', methods=['GET', 'POST'])
+#def station_setup():
+#    rooms = sorted({str(r) for r in range(100, 281)})
+#    rooms.extend(config.get('stations', []))
+#   rooms = sorted(set(rooms))
+#
+#    if request.method == 'POST':
+#        selected = request.form.get('station')
+#        session['station_id'] = selected
+#        return redirect(url_for('passlog.station_console'))
+#
+ #   return render_template('station_setup.html', rooms=rooms)

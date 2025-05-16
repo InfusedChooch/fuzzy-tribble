@@ -164,13 +164,30 @@ function addNote(studentId, passId) {
 /* ----------------------------------------------------------
    Create override pass
 ---------------------------------------------------------- */
+/* ----------------------------------------------------------
+   Create override pass
+---------------------------------------------------------- */
 document.getElementById('create-pass-form')?.addEventListener('submit', function (e) {
   e.preventDefault();
   const studentId = document.getElementById('student_id').value.trim();
+  const roomOut = document.getElementById('override_room')?.value.trim();  // 🆕 new field
+  const period = document.getElementById('override_period')?.value.trim(); // optional fallback
+
+  const payload = {
+    student_id: studentId
+  };
+
+  if (roomOut) {
+    payload.room = roomOut;
+  }
+  if (period) {
+    payload.period = period;
+  }
+
   fetch('/admin_create_pass', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ student_id: studentId })
+    body: JSON.stringify(payload)
   })
     .then(res => res.json())
     .then(data => {

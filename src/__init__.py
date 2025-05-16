@@ -28,7 +28,9 @@ def create_app():
     from .routes.report import report_bp
     from .routes.passlog import passlog_bp
     from .routes.core import core_bp
-
+    from .routes.core import ping_bp
+    
+    app.register_blueprint(ping_bp)
     app.register_blueprint(core_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(auth_bp)

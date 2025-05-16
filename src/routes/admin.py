@@ -58,9 +58,7 @@ def admin_view():
         Pass.checkin_time == None
     ).all()
 
-    pending_starts = []
-    pending_returns = []
-    active = []
+    pending_starts, pending_returns, active = [], [], []
 
     for p in open_passes:
         rec = {
@@ -73,7 +71,6 @@ def admin_view():
             "override": "✔️" if p.is_override else "",
             "status": p.status
         }
-
         if p.status == STATUS_PENDING_START:
             pending_starts.append(rec)
         elif p.status == STATUS_PENDING_RETURN:
@@ -81,10 +78,9 @@ def admin_view():
         else:
             active.append(rec)
 
-    # Recently returned passes
-    recent_returns = Pass.query.filter(Pass.status == STATUS_RETURNED)\
-        .order_by(Pass.date.desc(), Pass.checkout_time.desc())\
-        .limit(5).all()
+    recent_returns = Pass.query.filter_by(status=STATUS_RETURNED).order_by(
+        Pass.date.desc(), Pass.checkout_time.desc()
+    ).limit(5).all()
 
     recent_returns_data = []
     for p in recent_returns:
@@ -112,14 +108,13 @@ def admin_view():
             "override": "✔️" if p.is_override else ""
         })
 
-    active_rooms = get_active_rooms()
     return render_template(
         "admin.html",
         pending_starts=pending_starts,
         pending_returns=pending_returns,
         active=active,
         recent_returns=recent_returns_data,
-        active_rooms=active_rooms,
+        active_rooms=get_active_rooms(),
         admin_station=session.get("station_id", "")
     )
 
@@ -180,10 +175,12 @@ def admin_create_pass():
     if not session.get('logged_in'):
         return jsonify({'message': 'Unauthorized'}), 403
 
-    data       = request.get_json()
+    data = request.get_json()
     student_id = data.get('student_id')
-    student = db.session.get(Student, student_id)
+    period = data.get('period')
+    room_out = data.get('room', '').strip() or "OVERRIDE"
 
+    student = db.session.get(Student, student_id)
     if not student:
         return jsonify({'message': 'Student not found.'})
 
@@ -191,17 +188,17 @@ def admin_create_pass():
         return jsonify({'message': 'Student already has an active pass.'})
 
     override_pass = Pass(
-        student_id   = student.id,
-        date         = date.today(),
-        period       = data.get('period'),
-        checkout_time= datetime.now().time(),
-        station      = data.get('room', '').strip() or "OVERRIDE",
-        is_override  = True,
-        status       = STATUS_ACTIVE
+        student_id    = student.id,
+        date          = date.today(),
+        period        = period,
+        checkout_time = datetime.now().time(),
+        station       = room_out,
+        is_override   = True,
+        status        = STATUS_ACTIVE
     )
     db.session.add(override_pass)
     db.session.commit()
-    return jsonify({'message': f'Override pass created for {student.name}.'})
+    return jsonify({'message': f'Override pass created for {student.name} leaving {room_out}.'})
 
 # =================================================================
 # QUICK APPROVE / REJECT (pending start)

@@ -3,15 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <title>Admin Panel</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/icon.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
-  th {
-    background-color: #e4e4e4 !important;
-    color: #000 !important;
-  }
-</style>
-
-  <style>
+    th {
+      background-color: #e4e4e4 !important;
+      color: #000 !important;
+    }
     table { width: 100%; margin-bottom: 2em; border-collapse: collapse; }
     th, td { padding: .5em; border: 1px solid #ccc; text-align: center; }
     .pending_start { background: #cfe2ff; }
@@ -22,7 +20,11 @@
   </style>
 </head>
 <body>
-  <h1>Admin Panel — Station: {{ admin_station }}</h1>
+  <h1>Admin Panel</h1>
+
+  <!-- Shared styled clock + period -->
+  <div id="custom-clock" class="custom-clock">Loading time…</div>
+  <div class="period" id="period">Checking current period...</div>
 
   <nav>
     <a href="{{ url_for('auth.admin_logout') }}">Logout</a> |
@@ -40,36 +42,37 @@
     {% endfor %}
   </small>
 
-<!-- Admin Tools -->
-<h2>Quick Admin Tools</h2>
-<div style="display: flex; gap: 2em; align-items: flex-end; flex-wrap: wrap;">
-  <!-- Pop Out Station -->
-  <form id="station-popout-form" onsubmit="openStationView(event)" style="flex: 1; min-width: 260px;">
-    <label><strong>Pop Out Station</strong></label><br>
-    <input list="stations" id="station-selector" placeholder="Bathroom, Nurse, etc." required>
-    <datalist id="stations">
-      <option value="Bathroom">
-      <option value="Nurse">
-      <option value="Library">
-      <option value="Office">
-    </datalist>
-    <button type="submit">Open Station Window</button>
-  </form>
+  <!-- Admin Tools -->
+  <h2>Quick Admin Tools</h2>
+  <div style="display: flex; gap: 2em; align-items: flex-end; flex-wrap: wrap;">
+    <!-- Pop Out Station -->
+    <form id="station-popout-form" onsubmit="openStationView(event)" style="flex: 1; min-width: 260px;">
+      <label><strong>Pop Out Station</strong></label><br>
+      <input list="stations" id="station-selector" placeholder="Bathroom, Nurse, etc." required>
+      <datalist id="stations">
+        <option value="Bathroom">
+        <option value="Nurse">
+        <option value="Library">
+        <option value="Office">
+      </datalist>
+      <button type="submit">Open Station Window</button>
+    </form>
 
-  <!-- Create Override Pass -->
-  <form id="create-pass-form" style="flex: 1; min-width: 260px;">
-    <label><strong>Create Override Pass</strong></label><br>
-    <input type="text" id="student_id" placeholder="Student ID" required>
-    <button type="submit">Create Override</button>
-  </form>
-</div>
+    <!-- Create Override Pass -->
+    <form id="create-pass-form">
+      <input type="text" id="student_id" placeholder="Student ID" required>
+      <input type="text" id="override_room" placeholder="Room Out (e.g., 101)">
+      <input type="text" id="override_period" placeholder="Period (e.g., 3)">
+      <button type="submit">Create Override</button>
+    </form>
+  </div>
 
   <!-- Collapse All -->
   <button id="toggle-all" style="margin: 1em 0;">🔽 Collapse All</button>
 
-<!-- Collapsible: Pending All (merged) -->
-<button class="collapsible">Pending Requests</button>
-    <div class="content">
+  <!-- Collapsible: Pending All (merged) -->
+  <button class="collapsible">Pending Requests</button>
+  <div class="content">
     <table>
       <thead>
         <tr>
@@ -77,45 +80,41 @@
           <th>Student</th>
           <th>Room (Requested From)</th>
           <th>Time</th>
-          <th>Type</th> 
+          <th>Type</th>
           <th>Action</th>
         </tr>
       </thead>
-      <tbody id="pending-table">
-        <!-- will be filled dynamically -->
-      </tbody>
+      <tbody id="pending-table"></tbody>
     </table>
-</div>
+  </div>
 
-<!-- Collapsible: Active Passes -->
-<button class="collapsible">Active Passes</button>
-<div class="content">
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Name</th>
-        <th>Date</th>
-        <th>Period</th>
-        <th>Room Out</th>
-        <th>Station In</th>
-        <th>Station Out</th>
-        <th>Room In</th>
-        <th>Total</th>
-        <th>Hallway</th>
-        <th>Station</th>
-        <th>Action</th>
-        <th>Note</th>
-        <th>Status / Override</th>
-      </tr>
-    </thead>
-    <tbody id="passes-table">
-      <!-- JavaScript injects here -->
-    </tbody>
-  </table>
-</div>
+  <!-- Collapsible: Active Passes -->
+  <button class="collapsible">Active Passes</button>
+  <div class="content">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Date</th>
+          <th>Period</th>
+          <th>Room Out</th>
+          <th>Station In</th>
+          <th>Station Out</th>
+          <th>Room In</th>
+          <th>Total</th>
+          <th>Hallway</th>
+          <th>Station</th>
+          <th>Action</th>
+          <th>Note</th>
+          <th>Status / Override</th>
+        </tr>
+      </thead>
+      <tbody id="passes-table"></tbody>
+    </table>
+  </div>
 
-<!-- Recent Passes -->
+  <!-- Recently Returned -->
   <h2>Recently Returned Passes</h2>
   <table>
     <thead>
@@ -156,7 +155,7 @@
     </tbody>
   </table>
 
-
+  <!-- Change Admin Password -->
   <h2>Change Admin Password</h2>
   <form id="change-password-form">
     <input type="password" id="current_pass" placeholder="Current Password" required>
@@ -167,5 +166,6 @@
   </form>
 
   <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+  <script type="module" src="{{ url_for('static', filename='js/index.js') }}"></script>
 </body>
 </html>

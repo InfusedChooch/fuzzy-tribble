@@ -129,10 +129,32 @@ th {
   margin-bottom: 0.4em;
 }
 
-.clock {
-  font-size: 2em;
-  margin-top: 20px;
+.custom-clock {
+  background-color: black;
+  color: yellow;
+  border: 2px dotted yellow;
+  font-family: sans-serif;
+  font-style: italic;
+  font-weight: bold;
+  font-size: 1.1em;
+  padding: 10px 20px;
+  display: inline-block;
+  margin: 1em auto;
 }
+
+.clock {
+  background-color: black;
+  color: yellow;
+  border: 2px dotted yellow;
+  font-family: sans-serif;
+  font-style: italic;
+  font-weight: bold;
+  font-size: 1.1em;
+  padding: 10px 20px;
+  display: inline-block;
+  margin: 1em auto;
+}
+
 
 .pending-row tr {
   background: #cfe2ff;

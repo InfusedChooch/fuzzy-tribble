@@ -17,6 +17,8 @@ CREATE_NEW_PROCESS_GROUP = 0x00000200
 server_process = None
 current_mode   = None
 console_text   = None
+status_var = None
+status_label = None
 
 def get_local_ip():
     try:  return socket.gethostbyname(socket.gethostname())
@@ -40,7 +42,7 @@ def launch_server(mode, port, notebook):
         messagebox.showerror("Console Not Ready", "Please wait for the GUI to load before launching.")
         return
 
-    if server_process:
+    if server_process and server_process.poll() is None:
         messagebox.showinfo("Already running", "A server is already running.")
         return
 
@@ -48,8 +50,8 @@ def launch_server(mode, port, notebook):
     log(f"Launching {mode.upper()} on port {port}…")
 
     base = os.path.dirname(__file__)
-    vpy = sys.executable  # ✅ Use the current Python interpreter
-    wsgi = shutil.which("waitress-serve")  # ✅ Dynamically locate waitress-serve
+    vpy = sys.executable
+    wsgi = shutil.which("waitress-serve")
 
     if not os.path.exists(vpy):
         log(f"❌ Python interpreter not found: {vpy}")
@@ -67,16 +69,23 @@ def launch_server(mode, port, notebook):
         global server_process
         try:
             server_process = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1, creationflags=flags)
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                creationflags=flags
+            )
             current_mode = mode
             for line in server_process.stdout:
                 log(line.rstrip())
         except Exception as e:
             log(f"❌ Launch error: {e}")
             server_process = None
+            current_mode = None
 
     threading.Thread(target=stream, daemon=True).start()
+
 
 def stop_server():
     global server_process, current_mode
@@ -84,16 +93,22 @@ def stop_server():
         log("ℹ️ No server running.")
         return
     try:
+        if server_process.poll() is not None:
+            log("ℹ️ Server already exited.")
+            server_process = None
+            return
+
         if current_mode == "main" and IS_WINDOWS:
             log("🛑 CTRL+BREAK …")
             server_process.send_signal(signal.CTRL_BREAK_EVENT)
         else:
             log("🛑 Terminating …")
             server_process.terminate()
+
         server_process.wait(timeout=5)
         log("✅ Server stopped.")
     except Exception as e:
-        log(f"⚠️ {e} – kill()")
+        log(f"⚠️ {e} – trying kill()")
         try:
             server_process.kill()
             server_process.wait(timeout=5)
@@ -103,6 +118,7 @@ def stop_server():
     finally:
         server_process = None
         current_mode = None
+
 
 def create_routes_tab(notebook, port_var):
     tab = ttk.Frame(notebook)
@@ -180,6 +196,57 @@ def create_routes_tab(notebook, port_var):
 
     load_btn.config(command=load_routes)
 
+
+def render_config_editor_tab(notebook):
+    tab = ttk.Frame(notebook)
+    notebook.add(tab, text="Config Editor")
+
+    path = os.path.join("data", "config.json")
+
+    fields = [
+        ("School Name", "school_name"),
+        ("Theme Color (hex)", "theme_color"),
+        ("Passes Available", "passes_available"),
+        ("Max Pass Time (seconds)", "max_pass_time_seconds"),
+        ("Auto Reset Time (HH:MM)", "auto_reset_time"),
+        ("Session Timeout (min)", "session_timeout_minutes"),
+    ]
+
+    try:
+        with open(path, "r") as f:
+            config = json.load(f)
+    except Exception as e:
+        tk.Label(tab, text=f"Failed to load config.json: {e}", fg="red").pack(pady=10)
+        return
+
+    widgets = {}
+    for label_text, key in fields:
+        frame = ttk.Frame(tab)
+        frame.pack(anchor="w", padx=10, pady=4)
+        ttk.Label(frame, text=label_text, width=25).pack(side="left")
+        val = config.get(key, "")
+        var = tk.StringVar(value=str(val))
+        entry = ttk.Entry(frame, textvariable=var, width=40)
+        entry.pack(side="left")
+        widgets[key] = var
+
+    def save_config():
+        try:
+            for k, var in widgets.items():
+                val = var.get().strip()
+                if k in ["passes_available", "max_pass_time_seconds", "session_timeout_minutes"]:
+                    config[k] = int(val)
+                else:
+                    config[k] = val
+
+            with open(path, "w") as f:
+                json.dump(config, f, indent=2)
+            messagebox.showinfo("Saved", "Configuration updated.")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    ttk.Button(tab, text="Save Config", command=save_config).pack(pady=10)
+
 def render_rebuild_tab(notebook):
     tab = ttk.Frame(notebook)
     notebook.add(tab, text="Rebuild & Export")
@@ -238,10 +305,35 @@ def render_rebuild_tab(notebook):
 
     ttk.Button(tab, text="Export DB → /data/logs/", command=export_from_db).pack(pady=10)
 
+def check_server_health(port_var):
+    def _check():
+        import urllib.request, time
+        global status_var, status_label
+        while True:
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port_var.get()}/ping", timeout=2):
+                    if status_var:
+                        status_var.set("Server status: running")
+                        status_label.config(fg="green")
+            except:
+                if status_var:
+                    status_var.set("Server status: not responding")
+                    status_label.config(fg="red")
+            time.sleep(10)
+    threading.Thread(target=_check, daemon=True).start()
+
 def build_gui():
     global console_text
 
     root = tk.Tk()
+    icon_path = os.path.join("static", "images", "icon.png")
+    if os.path.exists(icon_path):
+        try:
+            root.iconphoto(True, tk.PhotoImage(file=icon_path))
+        except Exception as e:
+            print(f"Failed to set window icon: {e}")
+
+    
     root.title("Flask Server Launcher")
     root.geometry("1100x700")
     root.minsize(900, 600)
@@ -278,6 +370,7 @@ def build_gui():
     ttk.Button(tab_server, text="Launch via WSGI", command=lambda: launch_server("wsgi", port_var.get(), notebook)).grid(row=1, column=0, columnspan=2, pady=4)
     ttk.Button(tab_server, text="Launch via main.py", command=lambda: launch_server("main", port_var.get(), notebook)).grid(row=2, column=0, columnspan=2, pady=4)
     ttk.Button(tab_server, text="Stop Server", command=stop_server).grid(row=3, column=0, columnspan=2, pady=8)
+    ttk.Button(tab_server, text="Try to Open", command=lambda: browser(f"http://127.0.0.1:{port_var.get()}")).grid(row=3, column=2, columnspan=2, padx=10, pady=4)
 
     local = tk.Label(tab_server, text="🌐 Local: http://127.0.0.1:5000", fg="blue", cursor="hand2")
     local.grid(row=4, column=0, columnspan=2, sticky="w", padx=10)
@@ -285,6 +378,9 @@ def build_gui():
 
     lan_ip = get_local_ip()
     lan = tk.Label(tab_server, text=f"📡 LAN:   http://{lan_ip}:5000", fg="blue", cursor="hand2")
+    status_var = tk.StringVar(value="Server status: unknown")
+    status_label = tk.Label(tab_server, textvariable=status_var, font=("Arial", 10))
+    status_label.grid(row=6, column=2, sticky="w", padx=10)
     lan.grid(row=5, column=0, columnspan=2, sticky="w", padx=10)
     lan.bind("<Button-1>", lambda e: webbrowser.open_new_tab(f"http://{lan_ip}:{port_var.get()}"))
 
@@ -309,6 +405,8 @@ def build_gui():
     render_rebuild_tab(notebook)
 
     notebook.pack(expand=True, fill="both")
+    check_server_health(port_var)
+    render_config_editor_tab(notebook)
     root.mainloop()
 
 if __name__ == "__main__":

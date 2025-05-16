@@ -12,11 +12,11 @@
   "schedule_variants": {
     "regular": {
       "0": {
-        "start": "08:25",
+        "start": "07:00",
         "end": "08:30"
       },
       "1": {
-        "start": "08:33",
+        "start": "08:31",
         "end": "09:15"
       },
       "2": {
