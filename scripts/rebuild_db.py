@@ -3,7 +3,7 @@ import sys
 import json
 import shutil
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as dttime
 
 # ✅ Set project root and fix path
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -14,7 +14,6 @@ print("sys.path:", sys.path)  # Debugging help
 from src.database import create_app
 from src.models import db, Student, Pass, AuditLog, PassLog
 
-
 # ──────────────────────────── paths ──────────────────────────────
 ROOT_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SEED_DIR  = os.path.join(ROOT_DIR, "Seed")
@@ -23,11 +22,12 @@ DB_FILE   = os.path.join(DATA_DIR, "hallpass.db")
 PURGE_DIR = os.path.join(DATA_DIR, "purge")
 os.makedirs(PURGE_DIR, exist_ok=True)
 
-# allow `import src.*`
-sys.path.insert(0, ROOT_DIR)
-
-from src.database import create_app        # <-- your app factory
-from src.models   import db, Student, Pass, AuditLog, PassLog
+# ───────────────────── helper: parse time ────────────────────────
+def parse_time(s):
+    try:
+        return datetime.fromisoformat(s).time()
+    except:
+        return dttime.fromisoformat(s)
 
 # ────────────────────── helper: archive and purge ────────────────
 def archive_existing_db():
@@ -82,7 +82,7 @@ def rebuild_database():
 
         # ---------- audit logs ----------
         try:
-            with open(os.path.join(SEED_DIR, "auditlog.json")) as f:
+            with open(os.path.join(SEED_DIR, "audit.json")) as f:
                 audits = json.load(f)
             for a in audits:
                 db.session.add(AuditLog(
@@ -106,9 +106,8 @@ def rebuild_database():
                         student_id      = stu_id,
                         date            = datetime.fromisoformat(p["date"]).date(),
                         period          = p["period"],
-                        checkout_time   = datetime.strptime(p["checkout_time"], "%H:%M:%S").time(),
-                        checkin_time    = datetime.strptime(p["checkin_time"], "%H:%M:%S").time() \
-                                            if p.get("checkin_time") else None,
+                        checkout_time   = parse_time(p["checkout_time"]),
+                        checkin_time    = parse_time(p["checkin_time"]) if p.get("checkin_time") else None,
                         station         = p.get("station"),
                         total_pass_time = p.get("total_pass_time", 0),
                         note            = p.get("note"),

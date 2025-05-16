@@ -10,6 +10,7 @@ from datetime import datetime, date
 from src.models import db, Pass, Student, AuditLog        # AuditLog kept for future use
 import json, csv, io
 from src.utils import activate_room, get_active_rooms
+from src.utils import log_audit
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -20,13 +21,6 @@ STATUS_PENDING_START  = "pending_start"
 STATUS_PENDING_RETURN = "pending_return"
 STATUS_ACTIVE         = "active"
 STATUS_RETURNED       = "returned"
-
-
-# Central audit logger
-def log_audit(student_id, reason):
-    log = AuditLog(student_id=student_id, reason=reason, time=datetime.now())
-    db.session.add(log)
-    db.session.commit()
 
 # ──────────────────────────────────────────────────────────────────
 # Config helper
@@ -66,7 +60,7 @@ def admin_view():
             "student": p.student.name,
             "student_id": p.student.id,
             "room": p.station,
-            "time_out": p.checkout_time.strftime('%H:%M:%S') if p.checkout_time else '—',
+            "time_out": p.checkout_time.strftime('%H:%M:%S') if p.checkout_time else '-',
             "note": p.note or "",
             "override": "✔️" if p.is_override else "",
             "status": p.status
@@ -97,13 +91,13 @@ def admin_view():
             "student_name": p.student.name,
             "date": p.date.strftime('%Y-%m-%d'),
             "period": p.period,
-            "room_out": f"{p.station} @ {p.checkout_time.strftime('%H:%M:%S')}" if p.checkout_time else "—",
-            "station_in": f"{station_in.station} @ {station_in.timestamp.strftime('%H:%M:%S')}" if station_in else "—",
-            "station_out": f"{station_out.station} @ {station_out.timestamp.strftime('%H:%M:%S')}" if station_out else "—",
-            "room_in": f"{p.station} @ {p.checkin_time.strftime('%H:%M:%S')}" if p.checkin_time else "—",
-            "elapsed": f"{int(total_time//60)}m {int(total_time%60)}s" if total_time else "—",
-            "hallway_time": f"{int(hallway_time//60)}m {int(hallway_time%60)}s" if hallway_time else "—",
-            "station_time": f"{int(station_time//60)}m {int(station_time%60)}s" if station_time else "—",
+            "room_out": f"{p.station} @ {p.checkout_time.strftime('%H:%M:%S')}" if p.checkout_time else "-",
+            "station_in": f"{station_in.station} @ {station_in.timestamp.strftime('%H:%M:%S')}" if station_in else "-",
+            "station_out": f"{station_out.station} @ {station_out.timestamp.strftime('%H:%M:%S')}" if station_out else "-",
+            "room_in": f"{p.station} @ {p.checkin_time.strftime('%H:%M:%S')}" if p.checkin_time else "-",
+            "elapsed": f"{int(total_time//60)}m {int(total_time%60)}s" if total_time else "-",
+            "hallway_time": f"{int(hallway_time//60)}m {int(hallway_time%60)}s" if hallway_time else "-",
+            "station_time": f"{int(station_time//60)}m {int(station_time%60)}s" if station_time else "-",
             "note": p.note or "",
             "override": "✔️" if p.is_override else ""
         })
@@ -115,7 +109,8 @@ def admin_view():
         active=active,
         recent_returns=recent_returns_data,
         active_rooms=get_active_rooms(),
-        admin_station=session.get("station_id", "")
+        admin_station=session.get("station_id", ""),
+        config_stations=config.get("stations", [])
     )
 
 # =================================================================
@@ -126,7 +121,7 @@ def admin_passes():
     if not session.get('logged_in'):
         return jsonify({'error': 'Unauthorized'}), 403
 
-    # ✅ Only show truly active passes — not pending
+    # ✅ Only show truly active passes - not pending
     open_passes = Pass.query.filter(
         Pass.checkin_time == None,
         Pass.status == STATUS_ACTIVE
@@ -153,13 +148,13 @@ def admin_passes():
             "student_id"    : p.student.id,
             "date"          : p.date.strftime('%Y-%m-%d'),
             "period"        : p.period,
-            "room_time"     : f"{p.station} @ {p.checkout_time.strftime('%H:%M:%S')}" if p.checkout_time else "—",
-            "station_out"   : f"{station_out.station} @ {station_out.timestamp.strftime('%H:%M:%S')}" if station_out else "—",
-            "station_in"    : f"{station_in.station} @ {station_in.timestamp.strftime('%H:%M:%S')}" if station_in else "—",
-            "room_in"       : f"{p.station} @ {p.checkin_time.strftime('%H:%M:%S')}" if p.checkin_time else "—",
+            "room_time"     : f"{p.station} @ {p.checkout_time.strftime('%H:%M:%S')}" if p.checkout_time else "-",
+            "station_out"   : f"{station_out.station} @ {station_out.timestamp.strftime('%H:%M:%S')}" if station_out else "-",
+            "station_in"    : f"{station_in.station} @ {station_in.timestamp.strftime('%H:%M:%S')}" if station_in else "-",
+            "room_in"       : f"{p.station} @ {p.checkin_time.strftime('%H:%M:%S')}" if p.checkin_time else "-",
             "elapsed"       : f"{elapsed_secs//60}m {elapsed_secs%60}s",
-            "hallway_time"  : f"{hallway_time//60}m {hallway_time%60}s" if hallway_time else "—",
-            "station_time"  : f"{station_time//60}m {station_time%60}s" if station_time else "—",
+            "hallway_time"  : f"{hallway_time//60}m {hallway_time%60}s" if hallway_time else "-",
+            "station_time"  : f"{station_time//60}m {station_time%60}s" if station_time else "-",
             "note"          : p.note or "",
             "is_override"   : p.is_override,
             "status"        : p.status
@@ -198,6 +193,7 @@ def admin_create_pass():
     )
     db.session.add(override_pass)
     db.session.commit()
+    log_audit(student.id, f"Admin created override pass for Room {room_out}")
     return jsonify({'message': f'Override pass created for {student.name} leaving {room_out}.'})
 
 # =================================================================
@@ -215,6 +211,7 @@ def admin_approve_pass(pass_id):
     p.status = STATUS_ACTIVE
     p.checkout_time = datetime.now().time()  # ✅ timer starts now
     db.session.commit()
+    log_audit(p.student_id, f"Admin approved pass {pass_id}")
     return jsonify({'message': f'Pass {pass_id} approved.'})
 
 @admin_bp.route('/admin/reject/<int:pass_id>', methods=['POST'])
@@ -228,6 +225,7 @@ def admin_reject_pass(pass_id):
 
     db.session.delete(p)
     db.session.commit()
+    log_audit(p.student_id, f"Admin rejected pass {pass_id}")
     return jsonify({'message': f'Pass {pass_id} rejected.'})
 # =================================================================
 # pending start
@@ -249,7 +247,7 @@ def admin_pending_passes():
             "student_id": p.student.id,
             "student_name": p.student.name,
             "room": p.station,
-            "time": p.checkout_time.strftime('%H:%M:%S') if p.checkout_time else '—',
+            "time": p.checkout_time.strftime('%H:%M:%S') if p.checkout_time else '-',
             "status": p.status,         # pending_start or pending_return
             "pass_id": p.id             # used for action buttons
         })
@@ -277,6 +275,7 @@ def admin_checkin(pass_id):
         p.total_pass_time = int(delta.total_seconds())
 
     db.session.commit()
+    log_audit(p.student_id, f"Admin marked pass {pass_id} as returned")
     return jsonify({'message': f'Pass {pass_id} marked as returned.'})
 
 
@@ -304,22 +303,6 @@ def admin_add_note(student_id):
     db.session.commit()
     return jsonify({'message': 'Note saved.'})
 
-# =================================================================
-# SET THIS BROWSER’S STATION LABEL  (reuse station_setup.html)
-# =================================================================
-@admin_bp.route('/admin_station', methods=['GET', 'POST'])
-def set_station():
-    if not session.get('logged_in'):
-        return redirect(url_for('auth.admin_login'))
-
-    if request.method == 'POST':
-        station = request.form.get('station').strip()
-      #  session['admin_station'] = station
-       # activate_room(station)
-        return redirect(url_for('admin.admin_view'))
-
-    rooms = sorted({str(r) for r in range(100, 299)} | set(config.get('stations', [])))
-    return render_template('station_setup.html', rooms=rooms)
 # =================================================================
 # Weekly Summary
 # =================================================================
@@ -390,13 +373,13 @@ def admin_pass_history():
                 p.student.name,
                 p.date.strftime('%Y-%m-%d'),
                 p.period,
-                f"{p.station} @ {p.checkout_time.strftime('%H:%M:%S')}" if p.checkout_time else "—",
-                f"{sin.station} @ {sin.timestamp.strftime('%H:%M:%S')}" if sin else "—",
-                f"{sout.station} @ {sout.timestamp.strftime('%H:%M:%S')}" if sout else "—",
-                f"{p.station} @ {p.checkin_time.strftime('%H:%M:%S')}" if p.checkin_time else "—",
-                f"{int(total//60)}m {int(total%60)}s" if total else "—",
-                f"{int(hallway//60)}m {int(hallway%60)}s" if hallway else "—",
-                f"{int(station_time//60)}m {int(station_time%60)}s" if sin and sout else "—",
+                f"{p.station} @ {p.checkout_time.strftime('%H:%M:%S')}" if p.checkout_time else "-",
+                f"{sin.station} @ {sin.timestamp.strftime('%H:%M:%S')}" if sin else "-",
+                f"{sout.station} @ {sout.timestamp.strftime('%H:%M:%S')}" if sout else "-",
+                f"{p.station} @ {p.checkin_time.strftime('%H:%M:%S')}" if p.checkin_time else "-",
+                f"{int(total//60)}m {int(total%60)}s" if total else "-",
+                f"{int(hallway//60)}m {int(hallway%60)}s" if hallway else "-",
+                f"{int(station_time//60)}m {int(station_time%60)}s" if sin and sout else "-",
                 p.note or "",
                 "✔️" if p.is_override else ""
             ])
@@ -424,13 +407,13 @@ def admin_pass_history():
             "student": p.student.name,
             "date": p.date.strftime('%Y-%m-%d'),
             "period": p.period,
-            "room_out": f"{p.station} @ {p.checkout_time.strftime('%H:%M:%S')}" if p.checkout_time else "—",
-            "station_in": f"{sin.station} @ {sin.timestamp.strftime('%H:%M:%S')}" if sin else "—",
-            "station_out": f"{sout.station} @ {sout.timestamp.strftime('%H:%M:%S')}" if sout else "—",
-            "room_in": f"{p.station} @ {p.checkin_time.strftime('%H:%M:%S')}" if p.checkin_time else "—",
-            "duration": f"{int(total // 60)}m {int(total % 60)}s" if total else "—",
-            "hallway": f"{int(hallway // 60)}m {int(hallway % 60)}s" if hallway else "—",
-            "station": f"{int(station_time // 60)}m {int(station_time % 60)}s" if station_time else "—",
+            "room_out": f"{p.station} @ {p.checkout_time.strftime('%H:%M:%S')}" if p.checkout_time else "-",
+            "station_in": f"{sin.station} @ {sin.timestamp.strftime('%H:%M:%S')}" if sin else "-",
+            "station_out": f"{sout.station} @ {sout.timestamp.strftime('%H:%M:%S')}" if sout else "-",
+            "room_in": f"{p.station} @ {p.checkin_time.strftime('%H:%M:%S')}" if p.checkin_time else "-",
+            "duration": f"{int(total // 60)}m {int(total % 60)}s" if total else "-",
+            "hallway": f"{int(hallway // 60)}m {int(hallway % 60)}s" if hallway else "-",
+            "station": f"{int(station_time // 60)}m {int(station_time % 60)}s" if station_time else "-",
             "note": p.note or "",
             "override": "✔️" if p.is_override else ""
         })
@@ -459,9 +442,9 @@ def export_final_report():
             p.date.strftime('%Y-%m-%d'),
             p.period,
             f"{p.station} @ {p.checkout_time.strftime('%H:%M:%S')}",
-            f"{station_in.station} @ {station_in.timestamp.strftime('%H:%M:%S')}"  if station_in  else "—",
-            f"{station_out.station} @ {station_out.timestamp.strftime('%H:%M:%S')}" if station_out else "—",
-            f"{p.station} @ {p.checkin_time.strftime('%H:%M:%S')}" if p.checkin_time else "—"
+            f"{station_in.station} @ {station_in.timestamp.strftime('%H:%M:%S')}"  if station_in  else "-",
+            f"{station_out.station} @ {station_out.timestamp.strftime('%H:%M:%S')}" if station_out else "-",
+            f"{p.station} @ {p.checkin_time.strftime('%H:%M:%S')}" if p.checkin_time else "-"
         ])
 
     output.seek(0)

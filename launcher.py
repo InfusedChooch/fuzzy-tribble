@@ -98,36 +98,48 @@ def launch_server(mode: str, port: str, notebook):
 
 def stop_server():
     global server_process, current_mode, server_pid
+
     if not server_process:
         log("ℹ️ No server running.")
         return
+
     try:
         if server_process.poll() is not None:
             log("ℹ️ Server already exited.")
             server_process = None
             return
 
+        log(f"🛑 Attempting to stop server (PID {server_pid})…")
+
         if current_mode == "main" and IS_WINDOWS:
-            log("🛑 CTRL+BREAK …")
+            log("🛑 Sending CTRL+BREAK")
             server_process.send_signal(signal.CTRL_BREAK_EVENT)
         else:
-            log("🛑 Terminating …")
+            log("🛑 Sending terminate()")
             server_process.terminate()
 
-        server_process.wait(timeout=5)
-        log("✅ Server stopped.")
-    except Exception as exc:
-        log(f"⚠️ {exc} – trying kill()")
         try:
+            server_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            log("⚠️ Terminate timeout — forcing kill()")
             server_process.kill()
             server_process.wait(timeout=5)
-            log("💥 Killed.")
-        except Exception as kexc:
-            log(f"❌ kill() failed: {kexc}")
+            log("💥 Forced kill succeeded.")
+
+        log(f"✅ Server process PID {server_pid} stopped.")
+
+    except Exception as exc:
+        log(f"❌ Shutdown error: {exc}")
     finally:
+        if server_process and server_process.stdout:
+            try:
+                server_process.stdout.close()
+            except Exception as e:
+                log(f"⚠️ Could not close stdout: {e}")
+
         server_process = None
-        current_mode   = None
-        server_pid     = None
+        current_mode = None
+        server_pid = None
 
 
 def create_routes_tab(notebook, port_var):

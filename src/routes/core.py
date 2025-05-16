@@ -3,7 +3,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, jsonify
 from datetime import datetime, date
 from src.models import db, Student, Pass
-from src.utils import get_active_rooms
+from src.utils import get_active_rooms, log_audit
 import json, os
 
 core_bp = Blueprint('core', __name__)
@@ -55,9 +55,9 @@ def index():
     current_room = student.schedule.get(current_period)
 
     # Optional debug statements
-    print("DEBUG — Period:", current_period)
-    print("DEBUG — Room from schedule:", repr(current_room))
-    print("DEBUG — Active rooms:", get_active_rooms())
+    print("DEBUG - Period:", current_period)
+    print("DEBUG - Room from schedule:", repr(current_room))
+    print("DEBUG - Active rooms:", get_active_rooms())
 
     if not current_room or current_room.strip() not in get_active_rooms():
         return render_template("login.html", error=f"Room {current_room} is not accepting passes right now.")
@@ -169,6 +169,13 @@ def debug_active_rooms():
 def debug_students():
     students = Student.query.all()
     return jsonify([{ "id": s.id, "type": str(type(s.id)) } for s in students])
+
+@core_bp.route("/debug_audit")
+def debug_audit():
+    from src.utils import log_audit
+    log_audit("999", "Simulated audit for testing")
+    return "✅ Audit triggered", 200
+
 
 @ping_bp.route('/ping')
 def ping():

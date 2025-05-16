@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, session, redirect, url_for, jsonify, Response
 from src.models import db, Pass, Student
 from datetime import datetime
+from src.utils import log_audit
 import csv
 import io
 

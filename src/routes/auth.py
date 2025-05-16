@@ -6,18 +6,10 @@ from flask import (
 )
 from datetime import timedelta, datetime
 import json
-from src.utils import deactivate_room, get_active_rooms
+from src.utils import deactivate_room, get_active_rooms, log_audit
 from src.models import db, AuditLog, Student
 
 auth_bp = Blueprint('auth', __name__)
-
-# ------------------------------------------------------------------
-# Central audit logger
-# ------------------------------------------------------------------
-def log_audit(student_id, reason):
-    log = AuditLog(student_id=student_id, reason=reason, time=datetime.now())
-    db.session.add(log)
-    db.session.commit()
 
 # ------------------------------------------------------------------
 # Config helper
@@ -79,10 +71,9 @@ def login():
         current_period = get_current_period()
         current_room = student.schedule.get(current_period)
 
-        # Debug output
-        print("DEBUG — Period:", current_period)
-        print("DEBUG — Room from schedule:", repr(current_room))
-        print("DEBUG — Active rooms:", get_active_rooms())
+        print("DEBUG - Period:", current_period)
+        print("DEBUG - Room from schedule:", repr(current_room))
+        print("DEBUG - Active rooms:", get_active_rooms())
 
         if not current_room or current_room.strip() not in get_active_rooms():
             return render_template('login.html', error=f"Room {current_room} is not accepting passes right now.")
@@ -92,7 +83,7 @@ def login():
     return render_template('login.html')
 
 # ------------------------------------------------------------------
-# Admin login
+# Admin login (PATCHED)
 # ------------------------------------------------------------------
 @auth_bp.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
@@ -109,13 +100,11 @@ def admin_login():
         ):
             session['logged_in'] = True
             session['role'] = 'admin'
-        return redirect(url_for('admin.admin_view'))
+            log_audit("admin", f"Admin {username} logged in successfully")
+            return redirect(url_for('admin.admin_view'))
 
-        log_audit(username, "Failed admin login attempt.")
-        return render_template(
-            'admin_login.html',
-            error='Incorrect username or password.'
-        )
+        log_audit("admin", f"Failed admin login by {username}")
+        return render_template('admin_login.html', error='Incorrect username or password.')
 
     return render_template('admin_login.html')
 
@@ -127,6 +116,9 @@ def admin_logout():
     room = session.pop('admin_station', None)
     if room:
         deactivate_room(room)
+
+    if session.get("logged_in"):
+        log_audit("admin", "Admin logout")
 
     session.pop('logged_in', None)
     session.pop('role', None)

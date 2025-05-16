@@ -5,7 +5,8 @@
     "Bathroom",
     "Nurse",
     "Library",
-    "Office"
+    "Office",
+    "Guidance"
   ],
   "session_timeout_minutes": 60,
   "active_schedule": "regular",

@@ -1,13 +1,13 @@
 from flask import Blueprint, request, session, jsonify, render_template, redirect, url_for
 from datetime import datetime, date
 from src.models import db, Student, Pass, PassLog
-from src.utils import activate_room, deactivate_room
+from src.utils import activate_room, deactivate_room, log_audit
 import json, os
 
 passlog_bp = Blueprint('passlog', __name__)
 
 # ------------------------------------------------------------------
-# Central status names — keep in sync with admin.py & main.py
+# Central status names - keep in sync with admin.py & main.py
 # ------------------------------------------------------------------
 STATUS_PENDING_START  = "pending_start"
 STATUS_PENDING_RETURN = "pending_return"
