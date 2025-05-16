@@ -486,3 +486,37 @@ def admin_pending_count():
         "pending_start" : start_count,
         "pending_return": return_count
     })
+# =================================================================
+# Password Change
+# =================================================================
+@admin_bp.route('/admin_change_password', methods=['POST'])
+def admin_change_password():
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    data = request.get_json()
+    current = data.get('current_password', '').strip()
+    new = data.get('new_password', '').strip()
+    confirm = data.get('confirm_password', '').strip()
+
+    try:
+        with open('data/config.json', 'r') as f:
+            config = json.load(f)
+
+        if current != config.get('admin_password'):
+            return jsonify({"success": False, "message": "Current password incorrect."})
+
+        if not new:
+            return jsonify({"success": False, "message": "New password cannot be empty."})
+
+        if new != confirm:
+            return jsonify({"success": False, "message": "Passwords do not match."})
+
+        config['admin_password'] = new
+        with open('data/config.json', 'w') as f:
+            json.dump(config, f, indent=2)
+
+        return jsonify({"success": True, "message": "Password changed successfully."})
+
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Error: {e}"})
