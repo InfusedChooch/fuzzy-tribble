@@ -121,7 +121,7 @@ def stop_server():
         try:
             server_process.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            log("⚠️ Terminate timeout — forcing kill()")
+            log("⚠️ Terminate timeout -forcing kill()")
             server_process.kill()
             server_process.wait(timeout=5)
             log("💥 Forced kill succeeded.")

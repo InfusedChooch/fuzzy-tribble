@@ -100,7 +100,7 @@ def admin_login():
         ):
             session['logged_in'] = True
             session['role'] = 'admin'
-            log_audit("admin", f"Admin {username} logged in successfully")
+            log_audit("admin",f"Admin {username} logged in successfully")
             return redirect(url_for('admin.admin_view'))
 
         log_audit("admin", f"Failed admin login by {username}")
@@ -118,7 +118,7 @@ def admin_logout():
         deactivate_room(room)
 
     if session.get("logged_in"):
-        log_audit("admin", "Admin logout")
+        log_audit("admin","Admin logout")
 
     session.pop('logged_in', None)
     session.pop('role', None)

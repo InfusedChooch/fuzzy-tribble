@@ -29,6 +29,6 @@ def log_audit(student_id, reason):
         log = AuditLog(student_id=student_id, reason=reason, time=datetime.now())
         db.session.add(log)
         db.session.commit()
-        print(f"[AUDIT] {student_id} – {reason}")
+        print(f"[AUDIT]{student_id} - {reason}")
     except Exception as e:
         print(f"[AUDIT ERROR] {e}")
