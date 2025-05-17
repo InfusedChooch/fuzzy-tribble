@@ -71,12 +71,14 @@ def login():
         current_period = get_current_period()
         current_room = student.schedule.get(current_period)
 
-        print("DEBUG - Period:", current_period)
-        print("DEBUG - Room from schedule:", repr(current_room))
-        print("DEBUG - Active rooms:", get_active_rooms())
+        #print("DEBUG - Period:", current_period)
+        #print("DEBUG - 2Room from schedule:", repr(current_room))
+        #print("DEBUG - Active rooms:", get_active_rooms())
+        log_audit(student.id, f"Attempted to access inactive room")
 
         if not current_room or current_room.strip() not in get_active_rooms():
             return render_template('login.html', error=f"Room {current_room} is not accepting passes right now.")
+        
 
         return redirect(url_for('core.passroom_view', room=current_room.strip()))
 

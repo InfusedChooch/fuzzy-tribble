@@ -55,9 +55,9 @@ def index():
     current_room = student.schedule.get(current_period)
 
     # Optional debug statements
-    print("DEBUG - Period:", current_period)
-    print("DEBUG - Room from schedule:", repr(current_room))
-    print("DEBUG - Active rooms:", get_active_rooms())
+    #print("DEBUG - Period:", current_period)
+    #print("DEBUG - 1Room from schedule:", repr(current_room))
+    #print("DEBUG - Active rooms:", get_active_rooms())
 
     if not current_room or current_room.strip() not in get_active_rooms():
         return render_template("login.html", error=f"Room {current_room} is not accepting passes right now.")
