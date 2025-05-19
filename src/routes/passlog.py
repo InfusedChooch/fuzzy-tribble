@@ -66,8 +66,8 @@ def station_console():
                     message = "Your pass is waiting for approval."
                 else:
                     logs_for_this_station = [l for l in active_pass.events if l.station == station]
-                    num_in = sum(1 for l in logs_for_this_station if l.event_type == "in")
-                    num_out = sum(1 for l in logs_for_this_station if l.event_type == "out")
+                    num_in = sum(1 for l in logs_for_this_station if l.event == "in")
+                    num_out = sum(1 for l in logs_for_this_station if l.event == "out")
                     new_event = "in" if num_in <= num_out else "out"
 
                     last_event = db.session.query(PassEvent).filter_by(pass_id=active_pass.id)\
@@ -75,7 +75,7 @@ def station_console():
 
                     if (
                         last_event and
-                        last_event.event_type == "out" and
+                        last_event.event == "out" and
                         new_event == "out" and
                         (datetime.utcnow() - last_event.timestamp).total_seconds() < 30
                     ):
@@ -84,14 +84,16 @@ def station_console():
                         if (
                             new_event == "in" and
                             station.isdigit() and
-                            station == active_pass.room_out and
+                            station == active_pass.origin_room and
                             not active_pass.events
                         ):
                             now = datetime.now()
                             active_pass.checkin_at = now
-                            delta = now - active_pass.checkout_at
-                            active_pass.total_pass_time = int(delta.total_seconds())
+                            active_pass.room_in = station  # ✅ NEW
                             active_pass.status = STATUS_RETURNED
+                            if active_pass.checkout_at:
+                                delta = now - active_pass.checkout_at
+                                active_pass.total_pass_time = int(delta.total_seconds())
                             db.session.commit()
                             message = f"{student.name}'s override pass ended at room {station}."
                         else:
@@ -99,22 +101,23 @@ def station_console():
                                 pass_id=active_pass.id,
                                 station=station,
                                 timestamp=datetime.utcnow(),
-                                event_type=new_event
+                                event=new_event
                             )
                             db.session.add(new_log)
 
                             if (
                                 new_event == "in" and
-                                station == active_pass.room_out and
-                                any(l.event_type == "out" for l in active_pass.events)
+                                station == active_pass.origin_room and
+                                any(l.event == "out" for l in active_pass.events)
                             ):
                                 now = datetime.now()
                                 active_pass.checkin_at = now
-                                delta = now - active_pass.checkout_at
-                                active_pass.total_pass_time = int(delta.total_seconds())
-
-                                log_audit(student.student_id, f"Pass ended by student at correct station {station}")
+                                active_pass.room_in = station  # ✅ NEW
                                 active_pass.status = STATUS_RETURNED
+                                if active_pass.checkout_at:
+                                    delta = now - active_pass.checkout_at
+                                    active_pass.total_pass_time = int(delta.total_seconds())
+                                log_audit(student.student_id, f"Pass ended by student at correct station {station}")
                             else:
                                 active_pass.status = STATUS_ACTIVE
 
@@ -126,7 +129,8 @@ def station_console():
                     active_count = Pass.query.filter_by(
                         date=datetime.now().date(),
                         period=current_period,
-                        origin_room = station ).filter(Pass.checkin_at == None).count()
+                        origin_room=station
+                    ).filter(Pass.checkin_at == None).count()
 
                     if active_count >= max_passes:
                         message = f"Max passes reached for Room {station}."

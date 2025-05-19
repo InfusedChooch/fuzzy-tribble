@@ -84,7 +84,7 @@ def admin_view():
             "room_out": f"{p.room_out} @ {p.checkout_at.strftime('%H:%M:%S')}" if p.checkout_at else "-",
             "station_in": f"{station_in.station} @ {station_in.timestamp.strftime('%H:%M:%S')}" if station_in else "-",
             "station_out": f"{station_out.station} @ {station_out.timestamp.strftime('%H:%M:%S')}" if station_out else "-",
-            "room_in": f"{p.room_in} @ {p.checkin_at.strftime('%H:%M:%S')}" if p.checkin_at else "-",
+           "room_in": f"{p.room_in} @ {p.checkin_at.strftime('%H:%M:%S')}" if p.checkin_at else "-",
             "elapsed": f"{int(total_time//60)}m {int(total_time%60)}s" if total_time else "-",
             "hallway_time": f"{int(hallway_time//60)}m {int(hallway_time%60)}s" if hallway_time else "-",
             "station_time": f"{int(station_time//60)}m {int(station_time%60)}s" if station_time else "-",
@@ -302,6 +302,29 @@ def admin_pending_count():
         "pending_start" : start_count,
         "pending_return": return_count
     })
+
+@admin_bp.route('/admin_pending_passes')
+def admin_pending_passes():
+    if not session.get('logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    pending = Pass.query.filter(
+        Pass.status.in_([STATUS_PENDING_START, STATUS_PENDING_RETURN]),
+        Pass.checkin_at == None
+    ).all()
+
+    results = []
+    for p in pending:
+        results.append({
+            "pass_id": p.id,
+            "student_id": p.student_id,
+            "student_name": p.student.name if p.student else "—",
+            "room": p.origin_room,
+            "time": p.checkout_at.strftime("%H:%M:%S") if p.checkout_at else "—",
+            "status": p.status
+        })
+
+    return jsonify(results)
 
 # =================================================================
 @admin_bp.route('/admin_change_password', methods=['POST'])

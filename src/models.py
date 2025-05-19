@@ -47,6 +47,7 @@ class Pass(db.Model):
     period        = db.Column(db.String(10))
     origin_room   = db.Column(db.String(10), nullable=False)   # real column
     room_out = db.synonym("origin_room")
+    room_in     = db.Column(db.String(10))
     is_override   = db.Column(db.Boolean, default=False)
     note          = db.Column(db.Text)
     status        = db.Column(
