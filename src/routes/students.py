@@ -1,9 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, Response
-from src.models import db, Student
+from src.models import db, Student, StudentPeriod
 from src.utils import log_audit
 import csv
 import io
-import json
 
 students_bp = Blueprint('students', __name__)
 
@@ -22,11 +21,13 @@ def download_students_csv():
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['ID', 'Name', 'Schedule'])  # ✅ updated header
+    writer.writerow(['ID', 'Name', 'Period', 'Room'])  # Updated format
 
-    for student in Student.query.all():
-        schedule_json = json.dumps(student.schedule or {})
-        writer.writerow([student.id, student.name, schedule_json])  # ✅ write schedule
+    students = Student.query.all()
+    for student in students:
+        periods = StudentPeriod.query.filter_by(student_id=student.student_id).all()
+        for sp in periods:
+            writer.writerow([student.student_id, student.name, sp.period, sp.room])
 
     output.seek(0)
     return Response(output, mimetype="text/csv", headers={"Content-Disposition": "attachment; filename=students.csv"})
@@ -41,19 +42,30 @@ def upload_students_csv():
         return "No file uploaded", 400
 
     try:
+        # Clear existing data
+        StudentPeriod.query.delete()
         Student.query.delete()
         db.session.commit()
 
         stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
         reader = csv.DictReader(stream)
+
+        student_cache = {}
         for row in reader:
-            schedule = json.loads(row['Schedule'])
-            new_student = Student(
-                id=row['ID'].strip(),
-                name=row['Name'].strip(),
-                schedule=schedule
-            )
-            db.session.add(new_student)
+            student_id = row['ID'].strip()
+            name = row['Name'].strip()
+            period = str(row['Period']).strip()
+            room = str(row['Room']).strip()
+
+            if student_id not in student_cache:
+                student = Student(student_id=student_id, name=name)
+                db.session.add(student)
+                student_cache[student_id] = student
+            else:
+                student = student_cache[student_id]
+
+            sp = StudentPeriod(student_id=student_id, period=period, room=room)
+            db.session.add(sp)
 
         db.session.commit()
         return redirect(url_for('students.manage_students'))
@@ -66,24 +78,21 @@ def add_student():
     if not session.get('logged_in'):
         return redirect(url_for('auth.admin_login'))
 
-    student_id = request.form.get('id')
-    name = request.form.get('name')
-    schedule_raw = request.form.get('schedule')  # NEW FIELD
-
-    if Student.query.get(student_id):
-        return "Student with this ID already exists", 400
+    student_id = request.form.get('id').strip()
+    name = request.form.get('name').strip()
+    period = request.form.get('period').strip()
+    room = request.form.get('room').strip()
 
     try:
-        schedule = json.loads(schedule_raw)
-    except Exception:
-        return "Invalid schedule format. Please use JSON.", 400
+        student = Student.query.get(student_id)
+        if not student:
+            student = Student(student_id=student_id, name=name)
+            db.session.add(student)
 
-    new_student = Student(
-        id=student_id,
-        name=name,
-        schedule=schedule
-    )
-    db.session.add(new_student)
-    db.session.commit()
+        sp = StudentPeriod(student_id=student_id, period=period, room=room)
+        db.session.add(sp)
+        db.session.commit()
+        return redirect(url_for('students.manage_students'))
 
-    return redirect(url_for('students.manage_students'))
+    except Exception as e:
+        return f"Add failed: {str(e)}", 500

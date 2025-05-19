@@ -1,0 +1,34 @@
+{
+  "600": [
+    {
+      "id": 1,
+      "student_id": "600",
+      "date": "2025-05-19",
+      "period": "5/6",
+      "checkout_time": "11:45:03.857744",
+      "checkin_time": "11:45:36.093636",
+      "station": "115",
+      "total_pass_time": 32,
+      "note": null,
+      "is_override": 0,
+      "status": "returned",
+      "logs": [
+        {
+          "station": "Library",
+          "event_type": "in",
+          "timestamp": "2025-05-19 15:45:16.347916"
+        },
+        {
+          "station": "Library",
+          "event_type": "out",
+          "timestamp": "2025-05-19 15:45:20.904880"
+        },
+        {
+          "station": "115",
+          "event_type": "in",
+          "timestamp": "2025-05-19 15:45:36.093516"
+        }
+      ]
+    }
+  ]
+}

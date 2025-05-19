@@ -1,6 +1,7 @@
 # launcher.py
 import tkinter as tk
 import pandas as pd
+import time
 from tkinter import ttk, messagebox
 import threading, subprocess, socket, webbrowser, os, sqlite3, json, csv, sys, signal, shutil
 from datetime import datetime
@@ -41,6 +42,30 @@ def get_exe_path(rel: str):
     base = getattr(sys, "_MEIPASS", os.path.abspath("."))
     return os.path.join(base, rel)
 
+# ─── audit log tailing ─────────────────────────────────────────────────────
+def stream_audit_log():
+    log_path = os.path.join("data", "logs", "console_audit.log")
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+
+    def _follow():
+        try:
+            with open(log_path, "r", encoding="utf-8") as f:
+                f.seek(0, os.SEEK_END)
+                while True:
+                    line = f.readline()
+                    if not line:
+                        time.sleep(1)
+                        continue
+                    if console_text:
+                        console_text.insert(tk.END, line)
+                        console_text.see(tk.END)
+        except Exception as e:
+            if console_text:
+                console_text.insert(tk.END, f"[Audit tail error] {e}\n")
+                console_text.see(tk.END)
+
+    threading.Thread(target=_follow, daemon=True).start()
+
 # ─── launch / stop ─────────────────────────────────────────────────────────
 def launch_server(mode: str, port: str, notebook):
     global server_process, current_mode, server_pid
@@ -59,7 +84,7 @@ def launch_server(mode: str, port: str, notebook):
     vpy  = sys.executable
     bundled_srv = os.path.join(os.path.dirname(sys.executable), SERVER_EXE_NAME)
 
-    if os.path.exists(bundled_srv):  # EXE version
+    if os.path.exists(bundled_srv):
         cmd = [bundled_srv, f"--port={port}"]
     else:
         if mode == "main":
@@ -95,6 +120,52 @@ def launch_server(mode: str, port: str, notebook):
             server_pid     = None
 
     threading.Thread(target=stream, daemon=True).start()
+
+def stop_server():
+    global server_process, current_mode, server_pid
+
+    if not server_process:
+        log("ℹ️ No server running.")
+        return
+
+    try:
+        if server_process.poll() is not None:
+            log("ℹ️ Server already exited.")
+            server_process = None
+            return
+
+        log(f"🛑 Attempting to stop server (PID {server_pid})…")
+
+        if current_mode == "main" and IS_WINDOWS:
+            log("🛑 Sending CTRL+BREAK")
+            server_process.send_signal(signal.CTRL_BREAK_EVENT)
+        else:
+            log("🛑 Sending terminate()")
+            server_process.terminate()
+
+        try:
+            server_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            log("⚠️ Terminate timeout -forcing kill()")
+            server_process.kill()
+            server_process.wait(timeout=5)
+            log("💥 Forced kill succeeded.")
+
+        log(f"✅ Server process PID {server_pid} stopped.")
+
+    except Exception as exc:
+        log(f"❌ Shutdown error: {exc}")
+    finally:
+        if server_process and server_process.stdout:
+            try:
+                server_process.stdout.close()
+            except Exception as e:
+                log(f"⚠️ Could not close stdout: {e}")
+
+        server_process = None
+        current_mode = None
+        server_pid = None
+
 
 def stop_server():
     global server_process, current_mode, server_pid
@@ -357,12 +428,12 @@ def build_gui():
         except Exception as e:
             print(f"Failed to set window icon: {e}")
 
-    
     root.title("Flask Server Launcher")
     root.geometry("1100x700")
     root.minsize(900, 600)
 
     notebook = ttk.Notebook(root)
+
 
     tab_server = ttk.Frame(notebook)
     notebook.add(tab_server, text="Server")
@@ -431,6 +502,7 @@ def build_gui():
     notebook.pack(expand=True, fill="both")
     check_server_health(port_var)
     render_config_editor_tab(notebook)
+    stream_audit_log()
     root.mainloop()
 
 if __name__ == "__main__":

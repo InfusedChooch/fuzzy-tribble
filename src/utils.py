@@ -4,6 +4,7 @@ from src.models import db, AuditLog
 from datetime import datetime
 
 ACTIVE_ROOMS_FILE = os.path.join('data', 'active_rooms.json')
+AUDIT_LOG_FILE = os.path.join('data', 'logs', 'console_audit.log')  # ✅ new
 
 def get_active_rooms():
     try:
@@ -29,6 +30,12 @@ def log_audit(student_id, reason):
         log = AuditLog(student_id=student_id, reason=reason, time=datetime.now())
         db.session.add(log)
         db.session.commit()
-        print(f"[AUDIT]{student_id} - {reason}")
+        line = f"[AUDIT] {student_id} - {reason}"
+        print(line)
+        with open(AUDIT_LOG_FILE, "a") as f:
+            f.write(line + "\n")  # ✅ file-based echo for launcher console
     except Exception as e:
-        print(f"[AUDIT ERROR] {e}")
+        err = f"[AUDIT ERROR] {e}"
+        print(err)
+        with open(AUDIT_LOG_FILE, "a") as f:
+            f.write(err + "\n")
