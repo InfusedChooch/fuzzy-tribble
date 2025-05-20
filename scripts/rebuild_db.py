@@ -1,41 +1,25 @@
-import os
-import sys
-import json
-import shutil
+import os, sys, shutil, csv
+from datetime import datetime, timedelta
 import pandas as pd
-from datetime import datetime, timedelta, time as dttime
 
-# ✅ Set project root and fix path
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+# ──────────────────────────── project paths ────────────────────────────
+ROOT_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT_DIR)
 
-print("sys.path:", sys.path)  # Debugging help
-
 from src.database import create_app
-from src.models import db, Student, Pass, AuditLog, PassLog
+from src.models   import db, Student, StudentPeriod, Pass, PassEvent, AuditLog
 
-# ──────────────────────────── paths ──────────────────────────────
-ROOT_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SEED_DIR  = os.path.join(ROOT_DIR, "Seed")
 DATA_DIR  = os.path.join(ROOT_DIR, "data")
 DB_FILE   = os.path.join(DATA_DIR, "hallpass.db")
 PURGE_DIR = os.path.join(DATA_DIR, "purge")
 os.makedirs(PURGE_DIR, exist_ok=True)
 
-# ───────────────────── helper: parse time ────────────────────────
-def parse_time(s):
-    try:
-        return datetime.fromisoformat(s).time()
-    except:
-        return dttime.fromisoformat(s)
-
-# ────────────────────── helper: archive and purge ────────────────
+# ────────────────────────── helper: archive DB ─────────────────────────
 def archive_existing_db():
     if not os.path.isfile(DB_FILE):
         print("ℹ️  No existing hallpass.db to archive.")
         return
-
-    # purge backups older than 7 days
     cutoff = datetime.now() - timedelta(days=7)
     for fname in os.listdir(PURGE_DIR):
         if fname.endswith(".db"):
@@ -43,21 +27,19 @@ def archive_existing_db():
             try:
                 if datetime.fromtimestamp(os.path.getmtime(fpath)) < cutoff:
                     os.remove(fpath)
-                    print(f"🗑️  Removed old backup {fname}")
-            except Exception as e:
-                print(f"⚠️  Could not delete {fname}: {e}")
+            except Exception:
+                pass
+    tag  = datetime.now().strftime("%Y%m%d_%H%M%S")
+    shutil.move(DB_FILE, os.path.join(PURGE_DIR, f"{tag}_hallpass.db"))
+    print(f"🗃️  Archived previous DB → purge/{tag}_hallpass.db")
 
-    # move current DB → purge/YYYYMMDD_hallpass.db
-    tag  = datetime.now().strftime("%Y%m%d")
-    dest = os.path.join(PURGE_DIR, f"{tag}_hallpass.db")
-    try:
-        shutil.move(DB_FILE, dest)
-        print(f"🗃️  Archived previous DB → {dest}")
-    except PermissionError:
-        print("❌ hallpass.db is in use. Close all apps using it and rerun.")
-        sys.exit(1)
+# ───────────────────────── helper: safe dateparse ─────────────────────
+def parse_dt(val):
+    if pd.isna(val) or val == "":
+        return None
+    return pd.to_datetime(val, utc=True).to_pydatetime()
 
-# ──────────────────────── main rebuild ───────────────────────────
+# ─────────────────────────── main rebuild fn ───────────────────────────
 def rebuild_database():
     archive_existing_db()
 
@@ -67,64 +49,55 @@ def rebuild_database():
         db.create_all()
         print("✅ Fresh database created.")
 
-        # ---------- students ----------
+        # ---------------- students ----------------
         try:
-            df = pd.read_csv(os.path.join(SEED_DIR, "masterlist.csv"))
-            for _, row in df.iterrows():
-                db.session.add(Student(
-                    id       = str(row["ID"]).strip(),
-                    name     = row["Name"],
-                    schedule = json.loads(row["Schedule"])
-                ))
+            df = pd.read_csv(os.path.join(SEED_DIR, "students.csv"))
+            db.session.bulk_insert_mappings(Student, df.to_dict("records"))
             print(f"✅ Loaded {len(df)} students.")
         except Exception as e:
-            print(f"⚠️  Student load error: {e}")
+            print(f"⚠️  students.csv load error: {e}")
 
-        # ---------- audit logs ----------
+        # -------------- student periods -----------
         try:
-            with open(os.path.join(SEED_DIR, "audit.json")) as f:
-                audits = json.load(f)
-            for a in audits:
-                db.session.add(AuditLog(
-                    student_id = str(a.get("student_id")),
-                    reason     = a["reason"],
-                    time       = datetime.fromisoformat(a["time"])
-                ))
-            print(f"✅ Loaded {len(audits)} audit entries.")
+            df = pd.read_csv(os.path.join(SEED_DIR, "student_periods.csv"))
+            db.session.bulk_insert_mappings(StudentPeriod, df.to_dict("records"))
+            print(f"✅ Loaded {len(df)} student-period rows.")
         except Exception as e:
-            print(f"⚠️  Audit‑log load error: {e}")
+            print(f"⚠️  student_periods.csv load error: {e}")
 
-        # ---------- passes + logs ----------
+        # ---------------- passes ------------------
         try:
-            with open(os.path.join(SEED_DIR, "passlog.json")) as f:
-                grouped = json.load(f)
-            pcount = 0
-            for stu_id, plist in grouped.items():
-                for p in plist:
-                    db.session.add(Pass(
-                        id              = p["id"],
-                        student_id      = stu_id,
-                        date            = datetime.fromisoformat(p["date"]).date(),
-                        period          = p["period"],
-                        checkout_time   = parse_time(p["checkout_time"]),
-                        checkin_time    = parse_time(p["checkin_time"]) if p.get("checkin_time") else None,
-                        station         = p.get("station"),
-                        total_pass_time = p.get("total_pass_time", 0),
-                        note            = p.get("note"),
-                        is_override     = p.get("is_override", False),
-                        status          = p.get("status", "returned")
-                    ))
-                    for log in p.get("logs", []):
-                        db.session.add(PassLog(
-                            pass_id    = p["id"],
-                            station    = log["station"],
-                            event_type = log["event_type"],
-                            timestamp  = datetime.fromisoformat(log["timestamp"])
-                        ))
-                    pcount += 1
-            print(f"✅ Loaded {pcount} passes.")
+            df = pd.read_csv(os.path.join(SEED_DIR, "passes.csv"))
+            df["checkout_at"] = df["checkout_at"].apply(parse_dt)
+            df["checkin_at"]  = df["checkin_at"].apply(parse_dt)
+            db.session.bulk_insert_mappings(Pass, df.to_dict("records"))
+            print(f"✅ Loaded {len(df)} passes.")
+        except FileNotFoundError:
+            print("ℹ️  passes.csv not found – skipping.")
         except Exception as e:
-            print(f"⚠️  Pass‑log load error: {e}")
+            print(f"⚠️  passes.csv load error: {e}")
+
+        # ------------- pass events ----------------
+        try:
+            df = pd.read_csv(os.path.join(SEED_DIR, "pass_events.csv"))
+            df["timestamp"] = df["timestamp"].apply(parse_dt)
+            db.session.bulk_insert_mappings(PassEvent, df.to_dict("records"))
+            print(f"✅ Loaded {len(df)} pass events.")
+        except FileNotFoundError:
+            print("ℹ️  pass_events.csv not found – skipping.")
+        except Exception as e:
+            print(f"⚠️  pass_events.csv load error: {e}")
+
+        # -------------- audit log -----------------
+        try:
+            df = pd.read_csv(os.path.join(SEED_DIR, "audit_log.csv"))
+            df["time"] = df["time"].apply(parse_dt)
+            db.session.bulk_insert_mappings(AuditLog, df.to_dict("records"))
+            print(f"✅ Loaded {len(df)} audit entries.")
+        except FileNotFoundError:
+            print("ℹ️  audit_log.csv not found – skipping.")
+        except Exception as e:
+            print(f"⚠️  audit_log.csv load error: {e}")
 
         db.session.commit()
         print("🎉 Rebuild complete — data/hallpass.db ready.")

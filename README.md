@@ -1,8 +1,8 @@
 # 🏢 Hall Pass Tracker (v0.7)
 
 A Flask-based digital hall pass system for managing student movement across rooms and stations.
-Built for school use with student-facing kiosks and a robust admin panel for live monitoring, overrides, logs, and reports.
-Now includes a GUI launcher with route preview, log streaming, dynamic server startup, **editable config**, and **schedule type switching**.
+Built for educational environments with student-facing kiosks, admin tools, logging, schedule flexibility, and GUI control.
+Now includes a desktop GUI launcher with full config editing, audit visibility, and real-time route preview.
 
 ---
 
@@ -12,84 +12,81 @@ Now includes a GUI launcher with route preview, log streaming, dynamic server st
 
 * Login using Student ID
 * Request pass from scheduled room
-* Request return when finished
-* Sign in/out of hallway stations (Bathroom, Nurse, Library, Office)
-* Auto-end pass when returning to original room station
-* Auto-end override pass with no logs if checking into assigned room
-* Enforced max passes per room (from config)
+* Return when finished
+* Sign in/out of hallway stations (Bathroom, Nurse, etc.)
+* Auto-end pass when returning to original room
+* Auto-end override pass if returning to assigned room with no logs
+* Configurable max passes per room (via config)
 
 ### ✅ Admin Features
 
-* Secure login with editable username & password
-* Create override passes with room/period inputs
-* Monitor all pending/active passes live (auto-refresh every 5 sec)
-* Approve/reject pass requests from a unified pending list
-* End any active pass manually
-* Add/update notes on any open pass
-* View 50 most recent returned passes with detailed timestamps:
+* Secure login with configurable username/password
+* Create override passes manually
+* Monitor all pending/active passes in real-time
+* Approve/reject requests via dashboard
+* Manually end any pass
+* Add/edit notes to open passes
+* View 50 most recent returns with full timestamps:
 
-  * Room Out + Time
-  * Station In + Out + Duration
-  * Room In + Time
-  * Hallway vs Station Time
-* Access weekly summary with pass stats and override tracking
-* Export final logs and weekly summary to CSV
-* ✨ Launch live kiosk via dropdown: `/station_view/<station>`
-* Upload/download student roster (CSV w/ JSON schedules)
+  * Room Out, Station In/Out, Room In
+  * Duration: total, hallway, station
+* View/export weekly pass summary per student
+* Export full pass and audit logs to CSV
+* Launch station kiosk from dropdown selector
+* Upload/download student rosters (CSV)
 
 ### 🔹 GUI Launcher (Updated)
 
 * Launch server via WSGI or `main.py`
-* Live popout console with server stdout/stderr
-* Clickable Local and LAN server links
-* Auto-discovers all routes and groups by file
-* Embedded browser preview for all GET routes
-* Uses `static/images/school_logo.png` as app/taskbar icon
-* Edit config settings live (including theme, max pass time, passes available)
+* Stream live stdout/stderr to GUI console
+* Local + LAN route links
+* Embedded browser to preview all GET routes
+* Editable config: color theme, pass limits, reset time
 * Switch between `regular`, `half_day`, and `delayed` schedules
-* Rebuild/reset database and export current logs
+* Export logs or rebuild/reset DB from seed files
+* Tail live audit log (`console_audit.log`)
 
 ---
 
-## 📂 File Structure
+## 📁 Project File Index
 
-```
-launcher.py
-LICENSE
-list_files.py
-main.py
-Paths.md
-README.md
-requirements.txt
-venvinstructions.txt
-wsgi.py
+```plaintext
+📁 /
+├── file_paths.md
+├── launcher.py
+├── list_files.py
+├── main.py
+├── README.md
+├── requirements.txt
+├── Worklog.md
+├── wsgi.py
 
-data/
-├── active_rooms.json
+📁 data/
 ├── config.json
 ├── hallpass.db
-├── station_heartbeat.json
 └── logs/
-    ├── 20250515_audit.json
-    ├── 20250515_auditlog.json
-    ├── 20250515_masterlist.csv
+    └── * (log files)
 
-Old/
-└── app.py
-
-scripts/
+📁 scripts/
+├── build_student_periods.py
+├── masterlist.csv
 └── rebuild_db.py
 
-Seed/
-├── auditlog.json
+📁 Seed/
+├── audit_log.csv
 ├── masterlist.csv
-└── passlog.json
+├── passes.csv
+├── pass_events.csv
+├── students.csv
+└── student_periods.csv
 
-src/
+📁 src/
 ├── __init__.py
 ├── database.py
 ├── models.py
 ├── utils.py
+├── services/
+│   └── pass_manager.py
 └── routes/
     ├── admin.py
     ├── auth.py
@@ -98,7 +95,7 @@ src/
     ├── report.py
     └── students.py
 
-static/
+📁 static/
 ├── student_upload_template.csv
 ├── css/
 │   └── style.css
@@ -107,18 +104,83 @@ static/
 │   └── school_logo.png
 └── js/
     ├── admin.js
-    └── index.js
+    ├── index.js
+    └── rooms.js
 
-templates/
+📁 templates/
 ├── admin.html
 ├── admin_login.html
 ├── admin_pass_history.html
 ├── admin_report.html
+├── admin_rooms.html
 ├── admin_weekly_summary.html
 ├── index.html
 ├── login.html
-├── station.html
+└── station.html
 └── students.html
+
+
+```
+
+---
+
+## 🌐 Project Logic Tree (Simplified)
+
+```plaintext
+🖥️ launcher.py — GUI launcher
+  ├── scripts/*.py — DB rebuild, student splitter
+  ├── data/config.json — editable in launcher
+  ├── data/logs/*.csv — exported reports
+  └── wsgi.py / main.py — launches Flask app (Waitress / direct)
+
+🧩 main.py / wsgi.py — App entrypoints
+  └── src/__init__.py — creates and configures the Flask app
+      ├── src/routes/*.py — defines all route blueprints
+      ├── src/models.py — database schema (Students, Passes, Logs)
+      ├── src/utils.py — shared helpers (config, periods, logging)
+      └── src/services/pass_manager.py — core pass lifecycle logic
+
+🌐 src/routes/*.py — Flask API + HTML endpoints
+  ├── admin.py — dashboards, room control, exports, pass admin
+  ├── auth.py — login/logout + session auth
+  ├── core.py — student passroom check-in/request logic
+  ├── passlog.py — kiosk station IN/OUT swipes, heartbeat
+  ├── report.py — admin reports (CSV/HTML)
+  └── students.py — upload/download student schedule
+
+🧠 src/services/pass_manager.py — Pass lifecycle functions
+  ├── create_pass(), approve_pass(), return_pass(), record_pass_event()
+  └── Used directly by admin.py and passlog.py
+
+🛠️ src/utils.py — General utilities
+  ├── get_current_period(), get_room(), log_audit(), load_config()
+  └── Also includes CSV export response wrapper
+
+📄 templates/*.html — Jinja2 HTML templates
+  ├── admin.html, login.html, index.html, station.html, etc.
+  └── Used via render_template() in routes
+
+📁 static/js/*.js — JavaScript logic
+  ├── index.js — student display, clock, period sync
+  ├── admin.js — dashboard tables, notes, pass controls
+  └── rooms.js — room manager UI (toggle, rename, stats, reset)
+
+📁 data/ — Runtime data
+  ├── config.json — full configuration (editable)
+  ├── station_heartbeat.json — last check-in timestamps
+  ├── hallpass.db — SQLite database (auto-rebuilt)
+  └── logs/ — audit log + CSV/JSON exports
+
+📁 scripts/ — Admin helper scripts
+  ├── build_student_periods.py — splits masterlist.csv into students.csv and student_periods.csv
+  ├── masterlist.csv — source input
+  └── rebuild_db.py — resets the DB from /Seed data
+
+📁 Seed/ — Initial seed data
+  └── CSVs for students, passes, logs (used by rebuild_db)
+
+🧾 Worklog.md — Dev notes and project TODOs
+
 ```
 
 ---
@@ -144,7 +206,7 @@ pip install -r requirements.txt
 python launcher.py
 ```
 
-Or run manually:
+Or manually:
 
 ```bash
 python main.py
@@ -156,49 +218,49 @@ waitress-serve --port=5000 wsgi:app
 
 ## 🥺 Pass Lifecycle
 
-1. **Student login** ➔ redirect to scheduled room
-2. **Request pass** ➔ marked `pending_start`
-3. **Admin approves** ➔ pass becomes `active`
-4. **Student logs station IN/OUT**
-5. **Student clicks return** ➔ `pending_return`
-6. **Admin approves** ➔ pass marked `returned` with logs
+1. Student login ➔ redirect to room view
+2. Request pass ➔ status = `pending_start`
+3. Admin approves ➔ status = `active`
+4. Student uses station(s)
+5. Click return ➔ status = `pending_return`
+6. Admin approves ➔ pass marked `returned`
 
 ---
 
 ## 💪 Testing Tips
 
-### Students
+### Student Testing
 
-* Log in and verify assigned room access
-* Request pass and visit a kiosk
-* Return to original room
+* Login and verify room access
+* Request a pass and swipe into a kiosk
+* Return pass and check audit trail
 
-### Admins
+### Admin Testing
 
-* Use `/admin_login` to access dashboard
-* Test overrides and notes
+* Login via `/admin_login`
+* Approve/reject passes and add notes
 * View history and export CSVs
-* Open kiosk station via "Pop Out Station" (dropdown in admin panel)
-* Switch day types (top left dropdown)
-* Test config editing via launcher
+* Launch station view via dropdown
+* Switch day type via launcher
+* Edit and save config in GUI
 
 ---
 
 ## ♻ What's New in v0.7
 
-* ✨ **Full pass logging with station in/out & elapsed time**
-* ✨ **Launcher supports config editing + day switching**
-* ✨ **Route preview & link tester in launcher**
-* 🖊️ Admin can now manually check-in/return passes
-* 🖊️ Override passes end instantly if no station logs are made
-* ✅ Students auto-routed only if room is active
-* 📊 Exported logs show station time, hallway time, notes, override
-* ⏰ Admin panel now shows real-time durations
-* 📲 `/ping` route for server health monitoring
-* 💡 Pass status tags: `pending_start`, `active`, `pending_return`, `returned`
+* ✨ Full logging: station in/out, durations
+* ✨ GUI: config editor + day schedule switching
+* ✨ Route preview browser inside launcher
+* 🖊️ Manual pass return by admin
+* 🖊️ Auto-end override pass with no logs
+* ✅ Students only route if room is active
+* 📊 CSVs now include notes + override indicators
+* ⏰ Admin panel shows live timers
+* 📲 `/ping` health endpoint for WSGI
+* 💡 Tags: `pending_start`, `active`, `pending_return`, `returned`
 
 ---
 
 ## 💼 License
 
-MIT — Free to use, modify, and deploy in educational settings.
+MIT — Free to use and modify in educational environments.

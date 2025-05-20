@@ -1,59 +1,36 @@
+# src/routes/passlog.py
+
 from flask import Blueprint, request, session, jsonify, render_template, redirect, url_for
-from datetime import datetime, date
-from src.models import db, Student, Pass, PassLog
-from src.utils import activate_room, deactivate_room, log_audit
+from datetime import datetime
 import json, os
+
+from src.models import db, Student, Pass, PassEvent
+from src.utils import (
+    activate_room, deactivate_room, get_current_period,
+    load_config, log_audit, get_active_rooms, is_station
+)
+from src.services import pass_manager
 
 passlog_bp = Blueprint('passlog', __name__)
 
-# ------------------------------------------------------------------
-# Central status names - keep in sync with admin.py & main.py
-# ------------------------------------------------------------------
-STATUS_PENDING_START  = "pending_start"
-STATUS_PENDING_RETURN = "pending_return"
-STATUS_ACTIVE         = "active"
-STATUS_RETURNED       = "returned"
+STATUS_PENDING_START  = pass_manager.STATUS_PENDING_START
+STATUS_PENDING_RETURN = pass_manager.STATUS_PENDING_RETURN
+STATUS_ACTIVE         = pass_manager.STATUS_ACTIVE
+STATUS_RETURNED       = pass_manager.STATUS_RETURNED
 
 HEARTBEAT_FILE = os.path.join('data', 'station_heartbeat.json')
-
-# ------------------------------------------------------------------
-# Config + Period helpers
-# ------------------------------------------------------------------
-def load_config():
-    try:
-        with open('data/config.json') as f:
-            config = json.load(f)
-            active = config.get("active_schedule", "regular")
-            config["period_schedule"] = config.get("schedule_variants", {}).get(active, {})
-            return config
-    except Exception:
-        return {}
-
 config = load_config()
 
-def get_current_period():
-    now = datetime.now().time()
-    for period, times in config.get("period_schedule", {}).items():
-        start = datetime.strptime(times["start"], "%H:%M").time()
-        end = datetime.strptime(times["end"], "%H:%M").time()
-        if start <= now <= end:
-            return period
-    return "N/A"
-
 # ------------------------------------------------------------------
-# Self‑service *station console* (kiosk view used by hallway stations)
-# ------------------------------------------------------------------
+@passlog_bp.route('/station_console', methods=['GET', 'POST'])
 @passlog_bp.route('/station_console', methods=['GET', 'POST'])
 def station_console():
     if 'station_id' not in session:
         return "⛔ Station not set. Please launch from the admin panel.", 403
 
     station = session['station_id']
-
-    # ✅ Always activate when console is opened (removed gatecheck)
     activate_room(station)
 
-    special_stations = set(config.get('stations', ["Bathroom", "Nurse", "Library", "Office"]))
     current_period = get_current_period()
     message = ""
 
@@ -64,125 +41,86 @@ def station_console():
         if not student:
             message = "Invalid student ID"
         else:
-            active_pass = Pass.query.filter_by(student_id=student.id, checkin_time=None).first()
+            active_pass = Pass.query.filter_by(student_id=student.student_id, checkin_at=None).first()
 
             if active_pass:
                 if active_pass.status == STATUS_PENDING_START:
                     message = "Your pass is waiting for approval."
                 else:
-                    logs_for_this_station = [l for l in active_pass.logs if l.station == station]
-                    num_in = sum(1 for l in logs_for_this_station if l.event_type == "in")
-                    num_out = sum(1 for l in logs_for_this_station if l.event_type == "out")
-                    new_event_type = "in" if num_in <= num_out else "out"
+                    logs_for_station = [l for l in active_pass.events if l.station == station]
+                    num_in = sum(1 for l in logs_for_station if l.event == "in")
+                    num_out = sum(1 for l in logs_for_station if l.event == "out")
+                    new_event = "in" if num_in <= num_out else "out"
 
-                    last_event = PassLog.query.filter_by(pass_id=active_pass.id)\
-                        .order_by(PassLog.timestamp.desc()).first()
+                    last_event = db.session.query(PassEvent).filter_by(pass_id=active_pass.id)\
+                        .order_by(PassEvent.timestamp.desc()).first()
+
+                    # ⛔ BLOCK: re-swipe into same station within 30 seconds of last 'out'
                     if (
                         last_event and
-                        last_event.event_type == "out" and
-                        new_event_type == "out" and
+                        last_event.station == station and
+                        last_event.event == "out" and
+                        new_event == "in" and
                         (datetime.utcnow() - last_event.timestamp).total_seconds() < 30
                     ):
-                        message = "Swipe already recorded."
+                        message = "Already swiped out - wait a moment before re-entering."
                     else:
-                        # ✅ Instant end for override/no travel
+                        # ✅ Only set room_in if entering a non-origin station for the first time
                         if (
-                            new_event_type == "in" and
-                            station.isdigit() and
-                            station == active_pass.station and
-                            not active_pass.logs
+                            new_event == "in" and
+                            not active_pass.room_in and
+                            station != active_pass.origin_room
                         ):
-                            active_pass.checkin_time = datetime.now().time()
-                            delta = datetime.combine(date.today(), active_pass.checkin_time) - \
-                                    datetime.combine(date.today(), active_pass.checkout_time)
-                            active_pass.total_pass_time = int(delta.total_seconds())
-                            active_pass.status = STATUS_RETURNED
+                            active_pass.room_in = station
                             db.session.commit()
-                            message = f"{student.name}'s override pass ended at room {station}."
+
+                        pass_manager.record_pass_event(active_pass, station, new_event)
+
+                        if new_event == "out" and active_pass.room_in == station:
+                            active_pass.room_in = None
+                            db.session.commit()
+
+                        if (
+                            new_event == "in" and
+                            station == active_pass.origin_room and
+                            any(l.event == "out" for l in active_pass.events)
+                        ):
+                            pass_manager.return_pass(active_pass, station=station)
+                            message = f"{student.name}'s pass ended at {station}."
                         else:
-                            new_log = PassLog(
-                                pass_id=active_pass.id,
-                                station=station,
-                                timestamp=datetime.utcnow(),
-                                event_type=new_event_type
-                            )
-                            db.session.add(new_log)
-
-                            if (
-                                new_event_type == "in" and
-                                station == active_pass.station and
-                                any(l.event_type == "out" for l in active_pass.logs)
-                            ):
-                                active_pass.checkin_time = datetime.now().time()
-                                delta = datetime.combine(date.today(), active_pass.checkin_time) - \
-                                        datetime.combine(date.today(), active_pass.checkout_time)
-                                active_pass.total_pass_time = int(delta.total_seconds())
-
-                                from src.routes.core import log_audit
-                                log_audit(student.id, f"Pass ended by student at correct station {station}")
-
-                                active_pass.status = STATUS_RETURNED
-                            else:
-                                active_pass.status = STATUS_ACTIVE
-
+                            active_pass.status = STATUS_ACTIVE
                             db.session.commit()
-                            message = f"{student.name} {new_event_type} recorded at {station}."
+                            message = f"{student.name} {new_event} recorded at {station}."
             else:
-                if station.isdigit():
-                    # ✅ Enforce max passes rule
+                # Room (numeric) = self-checkout allowed
+                if not is_station(station):
                     max_passes = config.get("passes_available", 2)
                     active_count = Pass.query.filter_by(
                         date=datetime.now().date(),
                         period=current_period,
-                        station=station
-                    ).filter(Pass.checkin_time == None).count()
+                        origin_room=station
+                    ).filter(Pass.checkin_at == None).count()
 
                     if active_count >= max_passes:
                         message = f"Max passes reached for Room {station}."
                     else:
                         new_pass = Pass(
-                            student_id=student.id,
+                            student_id=student.student_id,
                             date=datetime.now().date(),
                             period=current_period,
-                            checkout_time=datetime.now().time(),
-                            station=station,
+                            checkout_at=datetime.now(),
+                            origin_room=station,
                             status=STATUS_ACTIVE
                         )
                         db.session.add(new_pass)
                         db.session.commit()
+                        log_audit(student.student_id, f"Checked out from classroom {station}")
                         message = f"{student.name} checked out from Room {station}."
                 else:
                     message = "You don’t have an active pass to use this station."
 
     return render_template('station.html', station=station, passes=[], message=message)
 
-
-# ------------------------------------------------------------------
-# Heartbeat updater (station pings every 30s)
-# ------------------------------------------------------------------
-@passlog_bp.route('/station_heartbeat', methods=['POST'])
-def station_heartbeat():
-    if 'station_id' not in session:
-        return '', 403
-
-    station = session['station_id']
-    now = datetime.utcnow().isoformat()
-
-    try:
-        with open(HEARTBEAT_FILE, 'r') as f:
-            beats = json.load(f)
-    except:
-        beats = {}
-
-    beats[station] = now
-
-    with open(HEARTBEAT_FILE, 'w') as f:
-        json.dump(beats, f)
-
-    return '', 204
-
-# ------------------------------------------------------------------
-# Close station manually (admin password)
 # ------------------------------------------------------------------
 @passlog_bp.route('/close_station', methods=['POST'])
 def close_station():
@@ -201,27 +139,8 @@ def close_station():
     session.pop('station_id', None)
     return redirect(url_for('auth.login'))
 
-
-# ------------------------------------------------------------------
-# Public view for hallway TVs etc.
 # ------------------------------------------------------------------
 @passlog_bp.route('/station_view/<station_name>')
 def popout_station_view(station_name):
     session['station_id'] = station_name
     return redirect(url_for('passlog.station_console'))
-
-# ------------------------------------------------------------------
-# Dropdown for setting station (station_setup.html)
-# ------------------------------------------------------------------
-#@passlog_bp.route('/station_setup', methods=['GET', 'POST'])
-#def station_setup():
-#    rooms = sorted({str(r) for r in range(100, 281)})
-#    rooms.extend(config.get('stations', []))
-#   rooms = sorted(set(rooms))
-#
-#    if request.method == 'POST':
-#        selected = request.form.get('station')
-#        session['station_id'] = selected
-#        return redirect(url_for('passlog.station_console'))
-#
- #   return render_template('station_setup.html', rooms=rooms)

@@ -206,17 +206,6 @@ document.getElementById('change-password-form')?.addEventListener('submit', func
 });
 
 /* ----------------------------------------------------------
-   Open popout station view
----------------------------------------------------------- */
-function openStationView(event) {
-  event.preventDefault();
-  const station = document.getElementById('station-selector')?.value;
-  if (station) {
-    window.open(`/station_view/${station}`, '_blank', 'width=800,height=600');
-  }
-}
-
-/* ----------------------------------------------------------
    Collapsible sections + toggle all
 ---------------------------------------------------------- */
 document.addEventListener("DOMContentLoaded", () => {
@@ -248,6 +237,60 @@ document.addEventListener("DOMContentLoaded", () => {
     toggleAllBtn.textContent = anyOpen ? "🔼 Expand All" : "🔽 Collapse All";
   });
 });
+
+/* ----------------------------------------------------------
+   Window position/size memory for popouts
+---------------------------------------------------------- */
+function openWindowRemembered(path, name) {
+  const key = `windowSettings-${name}`;
+  const settings = JSON.parse(localStorage.getItem(key) || '{}');
+  const width = settings.width || 600;
+  const height = settings.height || 700;
+  const left = settings.left || (window.screenX + 100);
+  const top = settings.top || (window.screenY + 100);
+
+  const features = `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`;
+  const win = window.open(path, name, features);
+
+  const listener = () => {
+    try {
+      const x = win.screenX, y = win.screenY;
+      const w = win.outerWidth, h = win.outerHeight;
+      localStorage.setItem(key, JSON.stringify({ left: x, top: y, width: w, height: h }));
+    } catch (e) {
+      console.warn("❌ Failed to save window size/position:", e);
+    }
+  };
+
+  // Wait for unload on popout
+  win.addEventListener('beforeunload', listener);
+}
+
+/* ------- */
+
+function refreshStationList() {
+  fetch('/admin_rooms')
+    .then(res => res.json())
+    .then(data => {
+      const active = data.filter(r => r.active).map(r => r.room);
+      const container = document.getElementById("station-list");
+      if (!container) return;
+
+      if (active.length === 0) {
+        container.innerHTML = "📍 <strong>Open Stations:</strong> <em>None</em>";
+      } else {
+        const links = active.map(r =>
+          `<code><a href="#" onclick="openWindowRemembered('/station_view/${r}', 'station-${r}')">${r}</a></code>`
+        );
+        container.innerHTML = `📍 <strong>Open Stations:</strong> ${links.join(", ")}`;
+      }
+    })
+    .catch(err => console.error("Failed to refresh station list:", err));
+}
+
+setInterval(refreshStationList, 5000);  // Refresh every 5 seconds
+refreshStationList(); // Initial load
+
 
 /* ----------------------------------------------------------
    Kickoff interval updates
