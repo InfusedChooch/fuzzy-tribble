@@ -130,37 +130,6 @@ class PassEvent(db.Model):
 
     pass_ref = db.relationship("Pass", backref="events")
 
-# ---------------------------------------------------------------------
-# Legacy swipe logs  (routes/passlog.py still imports PassLog)
-# ---------------------------------------------------------------------
-class PassLog(db.Model):
-    """
-    Thin wrapper around the same idea as PassEvent.
-    Left here only so existing imports keep working.
-    """
-    __tablename__ = "pass_log"
-
-    id        = db.Column(db.Integer, primary_key=True)
-    pass_id   = db.Column(
-        db.Integer,
-        db.ForeignKey("passes.id", ondelete="CASCADE"),
-        nullable=False
-    )
-    station   = db.Column(db.String(50), nullable=False)
-    event     = db.Column(db.String(20), nullable=False)          # 'in' / 'out'
-    timestamp = db.Column(db.DateTime(timezone=True),
-                          default=datetime.utcnow)
-
-    pass_ref = db.relationship("Pass", backref="logs")
-
-    # backward-compat alias
-    @property
-    def event_type(self):
-        return self.event
-
-    @event_type.setter
-    def event_type(self, value):
-        self.event = value
 
 # ---------------------------------------------------------------------
 # Audit trail

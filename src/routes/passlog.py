@@ -1,44 +1,26 @@
+# src/routes/passlog.py
+
 from flask import Blueprint, request, session, jsonify, render_template, redirect, url_for
 from datetime import datetime, date
-from src.models import db, Student, Pass, PassEvent
-from src.utils import activate_room, deactivate_room, log_audit
 import json, os
+
+from src.models import db, Student, Pass, PassEvent
+from src.utils import (
+    activate_room, deactivate_room, get_current_period,
+    load_config, log_audit, get_active_rooms
+)
+from src.services import pass_manager
 
 passlog_bp = Blueprint('passlog', __name__)
 
-STATUS_PENDING_START  = "pending_start"
-STATUS_PENDING_RETURN = "pending_return"
-STATUS_ACTIVE         = "active"
-STATUS_RETURNED       = "returned"
+STATUS_PENDING_START  = pass_manager.STATUS_PENDING_START
+STATUS_PENDING_RETURN = pass_manager.STATUS_PENDING_RETURN
+STATUS_ACTIVE         = pass_manager.STATUS_ACTIVE
+STATUS_RETURNED       = pass_manager.STATUS_RETURNED
 
 HEARTBEAT_FILE = os.path.join('data', 'station_heartbeat.json')
-
-# ------------------------------------------------------------------
-# Config + Period helpers
-# ------------------------------------------------------------------
-def load_config():
-    try:
-        with open('data/config.json') as f:
-            config = json.load(f)
-            active = config.get("active_schedule", "regular")
-            config["period_schedule"] = config.get("schedule_variants", {}).get(active, {})
-            return config
-    except Exception:
-        return {}
-
 config = load_config()
 
-def get_current_period():
-    now = datetime.now().time()
-    for period, times in config.get("period_schedule", {}).items():
-        start = datetime.strptime(times["start"], "%H:%M").time()
-        end = datetime.strptime(times["end"], "%H:%M").time()
-        if start <= now <= end:
-            return period
-    return "N/A"
-
-# ------------------------------------------------------------------
-# Self‑service *station console* (kiosk view used by hallway stations)
 # ------------------------------------------------------------------
 @passlog_bp.route('/station_console', methods=['GET', 'POST'])
 def station_console():
@@ -65,9 +47,9 @@ def station_console():
                 if active_pass.status == STATUS_PENDING_START:
                     message = "Your pass is waiting for approval."
                 else:
-                    logs_for_this_station = [l for l in active_pass.events if l.station == station]
-                    num_in = sum(1 for l in logs_for_this_station if l.event == "in")
-                    num_out = sum(1 for l in logs_for_this_station if l.event == "out")
+                    logs_for_station = [l for l in active_pass.events if l.station == station]
+                    num_in = sum(1 for l in logs_for_station if l.event == "in")
+                    num_out = sum(1 for l in logs_for_station if l.event == "out")
                     new_event = "in" if num_in <= num_out else "out"
 
                     last_event = db.session.query(PassEvent).filter_by(pass_id=active_pass.id)\
@@ -87,43 +69,25 @@ def station_console():
                             station == active_pass.origin_room and
                             not active_pass.events
                         ):
-                            now = datetime.now()
-                            active_pass.checkin_at = now
-                            active_pass.room_in = station  # ✅ NEW
-                            active_pass.status = STATUS_RETURNED
-                            if active_pass.checkout_at:
-                                delta = now - active_pass.checkout_at
-                                active_pass.total_pass_time = int(delta.total_seconds())
-                            db.session.commit()
+                            pass_manager.return_pass(active_pass, station=station)
                             message = f"{student.name}'s override pass ended at room {station}."
                         else:
-                            new_log = PassEvent(
-                                pass_id=active_pass.id,
-                                station=station,
-                                timestamp=datetime.utcnow(),
-                                event=new_event
-                            )
-                            db.session.add(new_log)
+                            pass_manager.record_pass_event(active_pass, station, new_event)
 
+                            # Return only if coming back to origin room with valid logs
                             if (
                                 new_event == "in" and
                                 station == active_pass.origin_room and
                                 any(l.event == "out" for l in active_pass.events)
                             ):
-                                now = datetime.now()
-                                active_pass.checkin_at = now
-                                active_pass.room_in = station  # ✅ NEW
-                                active_pass.status = STATUS_RETURNED
-                                if active_pass.checkout_at:
-                                    delta = now - active_pass.checkout_at
-                                    active_pass.total_pass_time = int(delta.total_seconds())
-                                log_audit(student.student_id, f"Pass ended by student at correct station {station}")
+                                pass_manager.return_pass(active_pass, station=station)
+                                message = f"{student.name}'s pass ended at {station}."
                             else:
                                 active_pass.status = STATUS_ACTIVE
-
-                            db.session.commit()
-                            message = f"{student.name} {new_event} recorded at {station}."
+                                db.session.commit()
+                                message = f"{student.name} {new_event} recorded at {station}."
             else:
+                # Create new pass if station is a room and not kiosk-only
                 if station.isdigit():
                     max_passes = config.get("passes_available", 2)
                     active_count = Pass.query.filter_by(
@@ -143,9 +107,9 @@ def station_console():
                             origin_room=station,
                             status=STATUS_ACTIVE
                         )
-                        log_audit(student.student_id, f"Checked out from classroom {station}")
                         db.session.add(new_pass)
                         db.session.commit()
+                        log_audit(student.student_id, f"Checked out from classroom {station}")
                         message = f"{student.name} checked out from Room {station}."
                 else:
                     message = "You don’t have an active pass to use this station."

@@ -1,11 +1,18 @@
 # src/routes/core.py
 
 from flask import Blueprint, render_template, request, redirect, url_for, session, jsonify
-from datetime import datetime, date
+from datetime import datetime
 from sqlalchemy import select
+
 from src.models import db, Student, Pass, StudentPeriod
-from src.utils import get_active_rooms, log_audit
-import json, os
+from src.utils import (
+    load_config,
+    get_current_period,
+    get_room,
+    get_active_rooms,
+    log_audit
+)
+# from src.services import pass_manager  # Optional for future refactor
 
 core_bp = Blueprint('core', __name__)
 ping_bp = Blueprint('ping', __name__)
@@ -15,37 +22,9 @@ STATUS_PENDING_RETURN = "pending_return"
 STATUS_ACTIVE         = "active"
 STATUS_RETURNED       = "returned"
 
-# Load config
-def load_config():
-    try:
-        with open('data/config.json') as f:
-            config = json.load(f)
-            active = config.get("active_schedule", "regular")
-            config["period_schedule"] = config.get("schedule_variants", {}).get(active, {})
-            return config
-    except Exception:
-        return {}
-
 config = load_config()
 
-# Period helper
-def get_current_period():
-    now = datetime.now().time()
-    for period, times in config.get("period_schedule", {}).items():
-        start = datetime.strptime(times["start"], "%H:%M").time()
-        end   = datetime.strptime(times["end"], "%H:%M").time()
-        if start <= now <= end:
-            return str(period)
-    return "N/A"
-
-# Helper: get scheduled room from StudentPeriod
-def get_room(student_id, period):
-    sp = db.session.scalar(select(StudentPeriod).where(
-        StudentPeriod.student_id == student_id,
-        StudentPeriod.period == period
-    ))
-    return sp.room if sp else None
-
+# ─────────────────────────────────────────────────────────────────────────────
 @core_bp.route('/index')
 def index():
     if 'student_id' not in session:
@@ -60,6 +39,7 @@ def index():
 
     return redirect(url_for('core.passroom_view', room=current_room.strip()))
 
+# ─────────────────────────────────────────────────────────────────────────────
 @core_bp.route('/passroom/<room>', methods=['GET', 'POST'])
 def passroom_view(room):
     if 'student_id' not in session:
@@ -72,9 +52,9 @@ def passroom_view(room):
     if scheduled_room != room:
         return render_template('login.html', error=f"You are not scheduled for Room {room} this period.")
 
-    log_audit(student.student_id, f"Attempted to access room: {room}")
 
     if room not in get_active_rooms():
+        log_audit(student.student_id, f"Attempted to access inactive room: {room}")
         return render_template('login.html', error=f"Room {room} is not active right now.")
 
     if request.method == 'POST':
@@ -112,7 +92,7 @@ def passroom_view(room):
         origin_room=room
     ).filter(
         Pass.checkin_at == None,
-        Pass.is_override == False  # 🔁 Ignore override passes for display limit
+        Pass.is_override == False
     ).order_by(Pass.checkout_at).all()
 
     display_passes = [{
@@ -134,6 +114,7 @@ def passroom_view(room):
         session=session
     )
 
+# ─────────────────────────────────────────────────────────────────────────────
 @core_bp.route('/check', methods=['POST'])
 def deprecated_check():
     return jsonify({'message': 'This endpoint is no longer in use.'}), 410
@@ -172,6 +153,7 @@ def debug_audit():
     log_audit("999", "Simulated audit for testing")
     return "✅ Audit triggered", 200
 
+# ─────────────────────────────────────────────────────────────────────────────
 @ping_bp.route('/ping')
 def ping():
     return "pong", 200

@@ -1,11 +1,15 @@
+# src/routes/students.py
+
 from flask import Blueprint, render_template, request, redirect, url_for, session, Response
 from src.models import db, Student, StudentPeriod
-from src.utils import log_audit
+from src.utils import log_audit, load_config
 import csv
 import io
 
 students_bp = Blueprint('students', __name__)
+config = load_config()
 
+# ------------------------------------------------------------------
 @students_bp.route('/students')
 def manage_students():
     if not session.get('logged_in'):
@@ -14,6 +18,7 @@ def manage_students():
     students = Student.query.all()
     return render_template('students.html', students=students)
 
+# ------------------------------------------------------------------
 @students_bp.route('/students/download')
 def download_students_csv():
     if not session.get('logged_in'):
@@ -21,7 +26,7 @@ def download_students_csv():
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['ID', 'Name', 'Period', 'Room'])  # Updated format
+    writer.writerow(['ID', 'Name', 'Period', 'Room'])
 
     students = Student.query.all()
     for student in students:
@@ -32,6 +37,7 @@ def download_students_csv():
     output.seek(0)
     return Response(output, mimetype="text/csv", headers={"Content-Disposition": "attachment; filename=students.csv"})
 
+# ------------------------------------------------------------------
 @students_bp.route('/students/upload', methods=['POST'])
 def upload_students_csv():
     if not session.get('logged_in'):
@@ -68,11 +74,13 @@ def upload_students_csv():
             db.session.add(sp)
 
         db.session.commit()
+        log_audit("admin", "Uploaded student roster via CSV")
         return redirect(url_for('students.manage_students'))
 
     except Exception as e:
         return f"Upload failed: {str(e)}", 500
 
+# ------------------------------------------------------------------
 @students_bp.route('/students/add', methods=['POST'])
 def add_student():
     if not session.get('logged_in'):
@@ -92,6 +100,8 @@ def add_student():
         sp = StudentPeriod(student_id=student_id, period=period, room=room)
         db.session.add(sp)
         db.session.commit()
+
+        log_audit("admin", f"Manually added student {student_id} period {period} → {room}")
         return redirect(url_for('students.manage_students'))
 
     except Exception as e:

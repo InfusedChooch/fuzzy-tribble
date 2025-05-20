@@ -212,6 +212,15 @@ def stop_server():
         current_mode = None
         server_pid = None
 
+#-----------
+def run_split_masterlist():
+    script = os.path.join(os.path.dirname(__file__), "scripts", "build_student_periods.py")
+    try:
+        subprocess.run([sys.executable, script], check=True)
+        messagebox.showinfo("Done", "Masterlist split into students.csv and student_periods.csv.")
+    except subprocess.CalledProcessError as e:
+        messagebox.showerror("Failed", f"Split failed: {str(e)}")
+#--------
 
 def create_routes_tab(notebook, port_var):
     tab = ttk.Frame(notebook)
@@ -366,9 +375,9 @@ def render_rebuild_tab(notebook):
             messagebox.showinfo("Done", "Database rebuilt.")
         except subprocess.CalledProcessError as e:
             messagebox.showerror("Failed", str(e))
-
+    ttk.Label(tab, text="Pre-process Seed Files", font=("Arial", 10)).pack(pady=(20, 5))
+    ttk.Button(tab, text="Split Masterlist (Do before rebuild)", command=run_split_masterlist).pack(pady=(2, 20))
     ttk.Button(tab, text="Rebuild Database", command=trigger_rebuild).pack(pady=10)
-
     ttk.Label(tab, text="Export current DB to /data/logs/", font=("Arial", 10)).pack(pady=(30, 5))
 
     def export_from_db():
@@ -376,25 +385,43 @@ def render_rebuild_tab(notebook):
         log_dir = "data/logs"
         os.makedirs(log_dir, exist_ok=True)
         today = datetime.now().strftime("%Y%m%d")
+
         try:
             conn = sqlite3.connect(db_path)
-            pd.read_sql("SELECT * FROM audit_log", conn)\
-                .to_json(os.path.join(log_dir, f"{today}_audit.json"), orient="records", indent=2)
-            df_students = pd.read_sql("SELECT id, name, schedule FROM students", conn)
-            df_students.columns = ["ID", "Name", "Schedule"]  
-            df_students.to_csv(os.path.join(log_dir, f"{today}_masterlist.csv"), index=False)
 
-            df_pass = pd.read_sql("SELECT * FROM passes", conn)
-            df_log = pd.read_sql("SELECT * FROM pass_log", conn)
+            # Export audit_log
+            df_audit = pd.read_sql("SELECT * FROM audit_log", conn)
+            df_audit.to_csv(os.path.join(log_dir, f"{today}_audit_log.csv"), index=False)
+
+            # Export passes
+            df_passes = pd.read_sql("SELECT * FROM passes", conn)
+            df_passes.to_csv(os.path.join(log_dir, f"{today}_passes.csv"), index=False)
+
+            # Export pass events
+            df_events = pd.read_sql("SELECT * FROM pass_events", conn)
+            df_events.to_csv(os.path.join(log_dir, f"{today}_pass_events.csv"), index=False)
+
+            # Export students
+            df_students = pd.read_sql("SELECT * FROM students", conn)
+            df_students.columns = ["ID", "Name"] if "name" in df_students.columns else df_students.columns
+            df_students.to_csv(os.path.join(log_dir, f"{today}_students.csv"), index=False)
+
+            # Export student periods
+            df_periods = pd.read_sql("SELECT * FROM student_periods", conn)
+            df_periods.to_csv(os.path.join(log_dir, f"{today}_student_periods.csv"), index=False)
+
+            # Optional: JSON summary of passes with their logs
             grouped = {}
-            for _, p in df_pass.iterrows():
+            for _, p in df_passes.iterrows():
                 rec = p.to_dict()
-                rec["logs"] = df_log[df_log["pass_id"] == p["id"]][["station", "event_type", "timestamp"]].to_dict("records")
+                rec["logs"] = df_events[df_events["pass_id"] == p["id"]][["station", "event", "timestamp"]].to_dict("records")
                 grouped.setdefault(p["student_id"], []).append(rec)
             with open(os.path.join(log_dir, f"{today}_passlog.json"), "w") as fh:
                 json.dump(grouped, fh, indent=2)
+
             conn.close()
             messagebox.showinfo("Exported", f"Files saved to /data/logs/ with prefix {today}_*")
+
         except Exception as e:
             messagebox.showerror("Export failed", str(e))
 

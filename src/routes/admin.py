@@ -10,14 +10,15 @@ from flask import (
 from datetime import datetime, date
 from src.models import db, Pass, Student, AuditLog
 from src.utils import activate_room, get_active_rooms, log_audit
+from src.services import pass_manager  # ✅ NEW
 import json, csv, io
 
 admin_bp = Blueprint('admin', __name__)
 
-STATUS_PENDING_START  = "pending_start"
-STATUS_PENDING_RETURN = "pending_return"
-STATUS_ACTIVE         = "active"
-STATUS_RETURNED       = "returned"
+STATUS_PENDING_START  = pass_manager.STATUS_PENDING_START
+STATUS_PENDING_RETURN = pass_manager.STATUS_PENDING_RETURN
+STATUS_ACTIVE         = pass_manager.STATUS_ACTIVE
+STATUS_RETURNED       = pass_manager.STATUS_RETURNED
 
 def load_config():
     try:
@@ -68,7 +69,7 @@ def admin_view():
 
     recent_returns_data = []
     for p in recent_returns:
-        logs = sorted(p.logs, key=lambda l: l.timestamp)
+        logs = sorted(p.events, key=lambda l: l.timestamp)
         station_in = next((l for l in logs if l.event == "in"), None)
         station_out = next((l for l in logs if l.event == "out"), None)
 
@@ -84,7 +85,7 @@ def admin_view():
             "room_out": f"{p.room_out} @ {p.checkout_at.strftime('%H:%M:%S')}" if p.checkout_at else "-",
             "station_in": f"{station_in.station} @ {station_in.timestamp.strftime('%H:%M:%S')}" if station_in else "-",
             "station_out": f"{station_out.station} @ {station_out.timestamp.strftime('%H:%M:%S')}" if station_out else "-",
-           "room_in": f"{p.room_in} @ {p.checkin_at.strftime('%H:%M:%S')}" if p.checkin_at else "-",
+            "room_in": f"{p.room_in} @ {p.checkin_at.strftime('%H:%M:%S')}" if p.checkin_at else "-",
             "elapsed": f"{int(total_time//60)}m {int(total_time%60)}s" if total_time else "-",
             "hallway_time": f"{int(hallway_time//60)}m {int(hallway_time%60)}s" if hallway_time else "-",
             "station_time": f"{int(station_time//60)}m {int(station_time%60)}s" if station_time else "-",
@@ -118,7 +119,7 @@ def admin_passes():
     response = []
 
     for p in open_passes:
-        logs = sorted(p.logs, key=lambda l: l.timestamp)
+        logs = sorted(p.events, key=lambda l: l.timestamp)
         station_out = next((l for l in logs if l.event == "out"), None)
         station_in  = next((l for l in reversed(logs) if l.event == "in"), None)
 
@@ -146,12 +147,8 @@ def admin_passes():
 
     return jsonify(response)
 
-# (⚠️ PATCHING REMAINING ROUTES NEXT — let me know if you'd like the full patched file or just the rest)
-
 
 # =================================================================
-# MANUALLY CREATE / OVERRIDE PASS
-
 @admin_bp.route('/admin_create_pass', methods=['POST'])
 def admin_create_pass():
     if not session.get('logged_in'):
@@ -169,18 +166,7 @@ def admin_create_pass():
     if Pass.query.filter_by(student_id=student.student_id, checkin_at=None).first():
         return jsonify({'message': 'Student already has an active pass.'})
 
-    override_pass = Pass(
-        student_id    = student.student_id,
-        date          = date.today(),
-        period        = period,
-        checkout_at   = datetime.now(),
-        room_out      = room_out,
-        is_override   = True,
-        status        = STATUS_ACTIVE
-    )
-    db.session.add(override_pass)
-    db.session.commit()
-    log_audit(student.student_id, f"Admin created override pass for Room {room_out}")
+    pass_manager.create_pass(student.student_id, room_out, period, is_override=True)
     return jsonify({'message': f'Override pass created for {student.name} leaving {room_out}.'})
 
 # =================================================================
@@ -189,29 +175,16 @@ def admin_approve_pass(pass_id):
     if not session.get('logged_in'):
         return jsonify({'message': 'Unauthorized'}), 403
 
-    p = db.session.get(Pass, pass_id)
-    if not p or p.status != STATUS_PENDING_START:
-        return jsonify({'message': 'Pass not pending or not found.'})
-
-    p.status = STATUS_ACTIVE
-    p.checkout_at = datetime.now()
-    db.session.commit()
-    log_audit(p.student_id, f"Admin approved pass {pass_id}")
-    return jsonify({'message': f'Pass {pass_id} approved.'})
+    success = pass_manager.approve_pass(pass_id)
+    return jsonify({'message': f'Pass {pass_id} approved.' if success else 'Pass not pending or not found.'})
 
 @admin_bp.route('/admin/reject/<int:pass_id>', methods=['POST'])
 def admin_reject_pass(pass_id):
     if not session.get('logged_in'):
         return jsonify({'message': 'Unauthorized'}), 403
 
-    p = db.session.get(Pass, pass_id)
-    if not p or p.status != STATUS_PENDING_START:
-        return jsonify({'message': 'Pass not pending or not found.'})
-
-    db.session.delete(p)
-    db.session.commit()
-    log_audit(p.student_id, f"Admin rejected pass {pass_id}")
-    return jsonify({'message': f'Pass {pass_id} rejected.'})
+    success = pass_manager.reject_pass(pass_id)
+    return jsonify({'message': f'Pass {pass_id} rejected.' if success else 'Pass not pending or not found.'})
 
 # =================================================================
 @admin_bp.route('/admin_checkin/<int:pass_id>', methods=['POST'])
@@ -223,17 +196,8 @@ def admin_checkin(pass_id):
     if not p or p.checkin_at:
         return jsonify({'message': 'Invalid or already returned pass'})
 
-    now = datetime.now()
-    p.checkin_at = now
-    p.status = STATUS_RETURNED
-
-    if p.checkout_at:
-        delta = now - p.checkout_at
-        p.total_pass_time = int(delta.total_seconds())
-
-    db.session.commit()
-    log_audit(p.student_id, f"Admin marked pass {pass_id} as returned")
-    return jsonify({'message': f'Pass {pass_id} marked as returned.'})
+    success = pass_manager.return_pass(p)
+    return jsonify({'message': f'Pass {pass_id} marked as returned.' if success else 'Return failed'})
 
 # =================================================================
 @admin_bp.route('/admin_add_note/<student_id>', methods=['POST'])
@@ -255,7 +219,6 @@ def admin_add_note(student_id):
     db.session.commit()
     log_audit(student_id, "Note updated on active pass.")
     return jsonify({'message': 'Note saved.'})
-
 # =================================================================
 @admin_bp.route('/admin_weekly_summary')
 def admin_weekly_summary():

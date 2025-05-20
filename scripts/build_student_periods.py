@@ -18,7 +18,7 @@ SEED_DIR = Path(__file__).resolve().parent.parent / "Seed"
 SCRIPT_DIR = Path(__file__).resolve().parent.parent / "scripts"
 
 def build_periods():
-    src  = SCRIPT_DIR / "masterlist.csv"
+    src  = SEED_DIR / "masterlist.csv"
     out_periods = SEED_DIR / "student_periods.csv"
     out_list    = SEED_DIR / "students.csv"
 

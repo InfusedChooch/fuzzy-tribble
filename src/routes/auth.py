@@ -1,54 +1,27 @@
-# routes/auth.py
+# src/routes/auth.py
 
 from flask import (
     Blueprint, render_template, request, redirect,
     url_for, session, current_app
 )
-from datetime import timedelta, datetime
+from datetime import timedelta
 import json
-from sqlalchemy import select
-from src.utils import deactivate_room, get_active_rooms, log_audit
-from src.models import db, AuditLog, Student, StudentPeriod
+
+from src.utils import (
+    deactivate_room,
+    get_active_rooms,
+    get_current_period,
+    get_room,
+    log_audit,
+    load_config  # ✅ moved from local to utils
+)
+
+from src.models import db, AuditLog, Student
 
 auth_bp = Blueprint('auth', __name__)
 
-# ------------------------------------------------------------------
-# Config helper
-# ------------------------------------------------------------------
-def load_config():
-    try:
-        with open('data/config.json') as f:
-            config = json.load(f)
-            active = config.get("active_schedule", "regular")
-            config["period_schedule"] = config.get("schedule_variants", {}).get(active, {})
-            return config
-    except Exception:
-        return {}
-
 config = load_config()
 SESSION_TIMEOUT_MIN = config.get("session_timeout_minutes", 60)
-
-# ------------------------------------------------------------------
-# Helper: get current period
-# ------------------------------------------------------------------
-def get_current_period():
-    now = datetime.now().time()
-    for period, times in config.get("period_schedule", {}).items():
-        start = datetime.strptime(times["start"], "%H:%M").time()
-        end = datetime.strptime(times["end"], "%H:%M").time()
-        if start <= now <= end:
-            return str(period)
-    return "N/A"
-
-# ------------------------------------------------------------------
-# Helper: get assigned room from StudentPeriod
-# ------------------------------------------------------------------
-def get_room(student_id, period):
-    sp = db.session.scalar(select(StudentPeriod).where(
-        StudentPeriod.student_id == student_id,
-        StudentPeriod.period == period
-    ))
-    return sp.room if sp else None
 
 # ------------------------------------------------------------------
 # Global session‑timeout hook
@@ -94,7 +67,7 @@ def login():
     return render_template('login.html')
 
 # ------------------------------------------------------------------
-# Admin login (PATCHED)
+# Admin login
 # ------------------------------------------------------------------
 @auth_bp.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
@@ -111,7 +84,7 @@ def admin_login():
         ):
             session['logged_in'] = True
             session['role'] = 'admin'
-            log_audit("admin",f"Admin {username} logged in successfully")
+            log_audit("admin", f"Admin {username} logged in successfully")
             return redirect(url_for('admin.admin_view'))
 
         log_audit("admin", f"Failed admin login by {username}")
@@ -133,4 +106,4 @@ def admin_logout():
 
     session.pop('logged_in', None)
     session.pop('role', None)
-    return redirect(url_for('auth.admin_login'))
+    return redirect(url_for('auth.login'))
