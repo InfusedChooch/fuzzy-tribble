@@ -63,7 +63,7 @@ def station_console():
                         new_event == "in" and
                         (datetime.utcnow() - last_event.timestamp).total_seconds() < 30
                     ):
-                        message = "Already swiped out — wait a moment before re-entering."
+                        message = "Already swiped out - wait a moment before re-entering."
                     else:
                         # ✅ Only set room_in if entering a non-origin station for the first time
                         if (
@@ -120,28 +120,6 @@ def station_console():
                     message = "You don’t have an active pass to use this station."
 
     return render_template('station.html', station=station, passes=[], message=message)
-
-# ------------------------------------------------------------------
-@passlog_bp.route('/station_heartbeat', methods=['POST'])
-def station_heartbeat():
-    if 'station_id' not in session:
-        return '', 403
-
-    station = session['station_id']
-    now = datetime.utcnow().isoformat()
-
-    try:
-        with open(HEARTBEAT_FILE, 'r') as f:
-            beats = json.load(f)
-    except:
-        beats = {}
-
-    beats[station] = now
-
-    with open(HEARTBEAT_FILE, 'w') as f:
-        json.dump(beats, f)
-
-    return '', 204
 
 # ------------------------------------------------------------------
 @passlog_bp.route('/close_station', methods=['POST'])

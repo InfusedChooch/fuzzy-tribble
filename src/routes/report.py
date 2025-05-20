@@ -106,7 +106,7 @@ def admin_pass_history():
 
             writer.writerow([
                 p.student_id,
-                p.student.name if p.student else "—",
+                p.student.name if p.student else "-",
                 p.date.strftime('%Y-%m-%d'),
                 p.period,
                 f"{p.room_out} @ {p.checkout_at.strftime('%H:%M:%S')}" if p.checkout_at else "-",
@@ -135,7 +135,7 @@ def admin_pass_history():
 
         rows.append({
             "id": p.student_id,
-            "student": p.student.name if p.student else "—",
+            "student": p.student.name if p.student else "-",
             "date": p.date.strftime('%Y-%m-%d'),
             "period": p.period,
             "room_out": f"{p.room_out} @ {p.checkout_at.strftime('%H:%M:%S')}" if p.checkout_at else "-",

@@ -10,8 +10,9 @@ AUDIT_LOG_FILE = os.path.join('data', 'logs', 'console_audit.log')
 def get_active_rooms() -> set[str]:
     return {r.room for r in ActiveRoom.query.all()}
 
-def is_station(name: str) -> bool:
-    config = load_config()
+def is_station(name: str, config=None) -> bool:
+    if config is None:
+        config = load_config()
     return name and not name.isdigit() and name in config.get("stations", [])
 
 
@@ -34,16 +35,22 @@ def replace_rooms(room_list: list[str]):
 # ─── audit logger (unchanged) ───────────────────────────────────────────
 def log_audit(student_id, reason):
     try:
-        db.session.add(AuditLog(student_id=student_id, reason=reason, time=datetime.now()))
+        # Ensure only safe ASCII characters (no en dash)
+        clean_reason = reason.replace("–", "-").replace("—", "-")
+        line = f"[AUDIT] {student_id} - {clean_reason}"
+
+        db.session.add(AuditLog(student_id=student_id, reason=clean_reason, time=datetime.now()))
         db.session.commit()
-        line = f"[AUDIT] {student_id} – {reason}"
+
         print(line)
         os.makedirs(os.path.dirname(AUDIT_LOG_FILE), exist_ok=True)
         with open(AUDIT_LOG_FILE, "a", encoding="utf-8") as f:
             f.write(line + "\n")
+
     except Exception as e:
         err = f"[AUDIT ERROR] {e}"
         print(err)
+
         
 # ─── config + period helpers ───────────────────────────────────────────────
 def load_config():

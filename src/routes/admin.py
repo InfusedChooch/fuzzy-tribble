@@ -32,6 +32,11 @@ def load_config():
 
 config = load_config()
 
+def save_config(cfg: dict):
+    with open('data/config.json', 'w') as f:
+        json.dump(cfg, f, indent=2)
+
+
 # =================================================================
 @admin_bp.route('/admin')
 def admin_view():
@@ -281,9 +286,9 @@ def admin_pending_passes():
         results.append({
             "pass_id": p.id,
             "student_id": p.student_id,
-            "student_name": p.student.name if p.student else "—",
+            "student_name": p.student.name if p.student else "-",
             "room": p.origin_room,
-            "time": p.checkout_at.strftime("%H:%M:%S") if p.checkout_at else "—",
+            "time": p.checkout_at.strftime("%H:%M:%S") if p.checkout_at else "-",
             "status": p.status
         })
 
@@ -335,24 +340,25 @@ def admin_rooms():
     if not session.get('logged_in'):
         return jsonify({'error': 'unauthorized'}), 403
 
+    config = load_config()
+    passes_available = config.get("passes_available", 3)
+    default_station_slots = config.get("station_slots", 3)
+    config.setdefault("rooms", [])
+    config.setdefault("stations", [])
+
     if request.method == 'GET':
-        passes_available = config.get("passes_available", 3)
-        default_station_slots = config.get("station_slots", 3)
-        data = []
-
-        # ✅ Persist all rooms/stations ever configured or activated
-        configured_rooms = set(config.get("rooms", []))
-        configured_stations = set(config.get("stations", []))
+        configured_rooms = set(config["rooms"])
+        configured_stations = set(config["stations"])
         active_room_set = get_active_rooms()
-
         room_set = configured_rooms | configured_stations | active_room_set
 
+        data = []
         for room in sorted(room_set):
             is_active = room in active_room_set
-            is_a_station = is_station(room)
+            a_station = is_station(room, config=config)
 
-            if is_a_station:
-                pending = 0  # stations don't allow pending passes
+            if a_station:
+                pending = 0
                 taken = Pass.query.filter_by(room_in=room, status=STATUS_ACTIVE).count()
                 free = max(default_station_slots - taken, 0)
             else:
@@ -364,7 +370,7 @@ def admin_rooms():
 
             data.append({
                 "room": room,
-                "type": "station" if is_a_station else "room",
+                "type": "station" if a_station else "room",
                 "active": is_active,
                 "free": free,
                 "pending": pending,
@@ -374,7 +380,6 @@ def admin_rooms():
 
         return jsonify(data)
 
-    # ---------- State-Changing Methods ----------
     payload = request.get_json(force=True)
     room = payload.get("room", "").strip()
     if not room:
@@ -382,6 +387,13 @@ def admin_rooms():
 
     if request.method == 'POST':
         activate_room(room)
+        if room.isdigit():
+            if room not in config["rooms"]:
+                config["rooms"].append(room)
+        else:
+            if room not in config["stations"]:
+                config["stations"].append(room)
+        save_config(config)
         log_audit("admin", f"Activated room {room}")
         return '', 204
 
@@ -395,10 +407,15 @@ def admin_rooms():
         return '', 204
 
     if request.method == 'DELETE':
-        deactivate_room(room)  # just deactivate — don't remove from config
+        deactivate_room(room)
+        if room in config["rooms"]:
+            config["rooms"].remove(room)
+        if room in config["stations"]:
+            config["stations"].remove(room)
+        save_config(config)
         log_audit("admin", f"Removed room {room}")
         return '', 204
-    
+
 #----
 @admin_bp.route('/admin_rooms/rename', methods=['POST'])
 def rename_room():
@@ -406,7 +423,7 @@ def rename_room():
     old = data.get('old')
     new = data.get('new')
 
-    # for now, ActiveRoom only tracks names — so we remove old, add new
+    # for now, ActiveRoom only tracks names - so we remove old, add new
     if not old or not new:
         return jsonify({'error': 'Missing room name'}), 400
 

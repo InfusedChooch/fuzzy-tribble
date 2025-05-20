@@ -58,6 +58,64 @@ This file serves as a living changelog and task board for ongoing development, t
 - [ ] 📦 Exportable full student profile (pass history + summary)
 - [ ] 💡 Add dark mode / UI theme toggle to launcher
 
----
 
-_Last updated: {{today's date}}_
+### File Index
+file_paths.md
+launcher.py
+LICENSE
+list_files.py
+main.py
+README.md
+requirements.txt
+venvinstructions.txt
+Worklog.md
+wsgi.py
+data\active_rooms.json
+data\config.json
+data\hallpass.db
+data\station_heartbeat.json
+data\logs\20250520_audit_log.csv
+data\logs\20250520_passes.csv
+data\logs\20250520_passlog.json
+data\logs\20250520_pass_events.csv
+data\logs\20250520_students.csv
+data\logs\20250520_student_periods.csv
+data\logs\console_audit.log
+scripts\build_student_periods.py
+scripts\masterlist.csv
+scripts\rebuild_db.py
+Seed\audit_log.csv
+Seed\masterlist.csv
+Seed\passes.csv
+Seed\pass_events.csv
+Seed\students.csv
+Seed\student_periods.csv
+src\database.py
+src\models.py
+src\utils.py
+src\__init__.py
+src\routes\admin.py
+src\routes\auth.py
+src\routes\core.py
+src\routes\passlog.py
+src\routes\report.py
+src\routes\students.py
+src\services\pass_manager.py
+static\student_upload_template.csv
+static\css\style.css
+static\images\icon.png
+static\images\school_logo.png
+static\js\admin.js
+static\js\index.js
+static\js\rooms.js
+templates\admin.html
+templates\admin_login.html
+templates\admin_pass_history.html
+templates\admin_report.html
+templates\admin_rooms.html
+templates\admin_weekly_summary.html
+templates\index.html
+templates\login.html
+templates\station.html
+templates\students.html
+

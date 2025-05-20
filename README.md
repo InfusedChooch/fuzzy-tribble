@@ -51,70 +51,74 @@ Now includes a desktop GUI launcher with full config editing, audit visibility, 
 ## 📁 Project File Index
 
 ```plaintext
-.
+📁 /
 ├── file_paths.md
 ├── launcher.py
-├── LICENSE
 ├── list_files.py
 ├── main.py
 ├── README.md
 ├── requirements.txt
-├── venvinstructions.txt
 ├── Worklog.md
 ├── wsgi.py
-├── data
-│   ├── config.json
-│   ├── hallpass.db
-│   ├── station_heartbeat.json
-│   └── logs
-│       └── console_audit.log
-├── scripts
-│   ├── build_student_periods.py
-│   ├── masterlist.csv
-│   └── rebuild_db.py
-├── Seed
-│   ├── audit_log.csv
-│   ├── masterlist.csv
-│   ├── passes.csv
-│   ├── pass_events.csv
-│   ├── students.csv
-│   └── student_periods.csv
-├── src
-│   ├── __init__.py
-│   ├── database.py
-│   ├── models.py
-│   ├── utils.py
-│   ├── routes
-│   │   ├── admin.py
-│   │   ├── auth.py
-│   │   ├── core.py
-│   │   ├── passlog.py
-│   │   ├── report.py
-│   │   └── students.py
-│   └── services
-│       └── pass_manager.py
-├── static
-│   ├── student_upload_template.csv
-│   ├── css
-│   │   └── style.css
-│   ├── images
-│   │   ├── icon.png
-│   │   └── school_logo.png
-│   └── js
-│       ├── admin.js
-│       ├── index.js
-│       └── rooms.js
-└── templates
-    ├── admin.html
-    ├── admin_login.html
-    ├── admin_pass_history.html
-    ├── admin_report.html
-    ├── admin_rooms.html
-    ├── admin_weekly_summary.html
-    ├── index.html
-    ├── login.html
-    ├── station.html
-    └── students.html
+
+📁 data/
+├── config.json
+├── hallpass.db
+└── logs/
+    └── * (log files)
+
+📁 scripts/
+├── build_student_periods.py
+├── masterlist.csv
+└── rebuild_db.py
+
+📁 Seed/
+├── audit_log.csv
+├── masterlist.csv
+├── passes.csv
+├── pass_events.csv
+├── students.csv
+└── student_periods.csv
+
+📁 src/
+├── __init__.py
+├── database.py
+├── models.py
+├── utils.py
+├── services/
+│   └── pass_manager.py
+└── routes/
+    ├── admin.py
+    ├── auth.py
+    ├── core.py
+    ├── passlog.py
+    ├── report.py
+    └── students.py
+
+📁 static/
+├── student_upload_template.csv
+├── css/
+│   └── style.css
+├── images/
+│   ├── icon.png
+│   └── school_logo.png
+└── js/
+    ├── admin.js
+    ├── index.js
+    └── rooms.js
+
+📁 templates/
+├── admin.html
+├── admin_login.html
+├── admin_pass_history.html
+├── admin_report.html
+├── admin_rooms.html
+├── admin_weekly_summary.html
+├── index.html
+├── login.html
+└── station.html
+└── students.html
+
 
 ```
 

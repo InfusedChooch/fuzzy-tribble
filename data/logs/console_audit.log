@@ -465,3 +465,82 @@
 [AUDIT] admin – Activated room 115
 [AUDIT] admin – Deactivated room 115
 [AUDIT] admin – Activated room 115
+[AUDIT] admin – Admin admin logged in successfully
+[AUDIT] admin – Deactivated room 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] admin – Activated room 115
+[AUDIT] 600 – Approved pass 12
+[AUDIT] admin – Activated room Bathroom
+[AUDIT] 600 – IN at Bathroom
+[AUDIT] 600 – OUT at Bathroom
+[AUDIT] 600 – IN at 115
+[AUDIT] 600 – Returned pass 12 at 115
+[AUDIT] admin – Deactivated room Bathroom
+[AUDIT] admin – Deactivated room 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] admin – Activated room 115
+[AUDIT] admin – Deactivated room 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] admin – Admin logout
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] admin – Admin admin logged in successfully
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] admin – Admin admin logged in successfully
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] admin – Activated room 115
+[AUDIT] admin – Deactivated room 115
+[AUDIT] admin – Activated room 115
+[AUDIT] admin – Deactivated room 115
+[AUDIT] admin – Activated room 115
+[AUDIT] admin – Deactivated room 115
+[AUDIT] admin – Admin logout
+[AUDIT] admin – Activated room 115
+[AUDIT] admin – Deactivated room 115
+[AUDIT] admin – Activated room 115
+[AUDIT] admin – Activaaated room 115
+[AUDIT] admin – Deactivated room 115
+[AUDIT] admin – Activated room {room}
+[AUDIT] admin – Deactivated room 115
+[AUDIT] admin – Activated room {room}
+[AUDIT] admin – Deactivated room 115
+[AUDIT] admin – Activated room {room}
+[AUDIT] admin – Admin logout
+[AUDIT] admin – Admin admin logged in successfully
+[AUDIT] admin – Admin logout
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 – Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] admin - Admin admin logged in successfully
+[AUDIT] admin - Removed room 112
+[AUDIT] admin - Activated room 115
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Activated room 115
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Activated room 115
+[AUDIT] admin - Deactivated room 115

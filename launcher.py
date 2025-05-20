@@ -49,7 +49,7 @@ def stream_audit_log():
 
     def _follow():
         try:
-            with open(log_path, "r", encoding="utf-8") as f:
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
                 f.seek(0, os.SEEK_END)
                 while True:
                     line = f.readline()
@@ -57,7 +57,8 @@ def stream_audit_log():
                         time.sleep(1)
                         continue
                     if console_text:
-                        console_text.insert(tk.END, line)
+                        clean_line = line.replace("â€“", "-").replace("â€”", "-")
+                        console_text.insert(tk.END, clean_line)
                         console_text.see(tk.END)
         except Exception as e:
             if console_text:
@@ -65,6 +66,7 @@ def stream_audit_log():
                 console_text.see(tk.END)
 
     threading.Thread(target=_follow, daemon=True).start()
+
 
 # ─── launch / stop ─────────────────────────────────────────────────────────
 def launch_server(mode: str, port: str, notebook):
@@ -529,7 +531,7 @@ def build_gui():
     notebook.pack(expand=True, fill="both")
     check_server_health(port_var)
     render_config_editor_tab(notebook)
-    stream_audit_log()
+    #stream_audit_log()
 
     def on_close():
         stop_server()  # cleanly kill Flask server
