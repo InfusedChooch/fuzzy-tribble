@@ -1,8 +1,18 @@
-from datetime import datetime
+from datetime import datetime, date
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
 
 db = SQLAlchemy()
+
+# ---------------------------------------------------------------------
+# Students
+# ---------------------------------------------------------------------
+class ActiveRoom(db.Model):
+  
+    __tablename__ = "active_rooms"
+
+    room  = db.Column(db.String(20), primary_key=True)  # "115", "Bathroom", etc.
+    added = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
 
 # ---------------------------------------------------------------------
 # Students

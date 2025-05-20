@@ -455,7 +455,7 @@ def build_gui():
         except Exception as e:
             print(f"Failed to set window icon: {e}")
 
-    root.title("Flask Server Launcher")
+    root.title("Server Launcher")
     root.geometry("1100x700")
     root.minsize(900, 600)
 
@@ -530,6 +530,13 @@ def build_gui():
     check_server_health(port_var)
     render_config_editor_tab(notebook)
     stream_audit_log()
+
+    def on_close():
+        stop_server()  # cleanly kill Flask server
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", on_close)
+
     root.mainloop()
 
 if __name__ == "__main__":

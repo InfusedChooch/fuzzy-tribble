@@ -1,66 +1,54 @@
 # src/utils.py
-from flask import make_response
-import json
-import os
+import os, json
 from datetime import datetime
-from src.models import db, AuditLog, StudentPeriod
+from src.models import db, AuditLog, ActiveRoom
+from flask import make_response
 
-ACTIVE_ROOMS_FILE = os.path.join('data', 'active_rooms.json')
 AUDIT_LOG_FILE = os.path.join('data', 'logs', 'console_audit.log')
-CONFIG_FILE = os.path.join('data', 'config.json')
 
-def csv_response(output, base_filename):
-    output.seek(0)
-    today = datetime.now().strftime("%Y-%m-%d")
-    response = make_response(output.read())
-    response.headers["Content-Disposition"] = f"attachment; filename={base_filename}_{today}.csv"
-    response.headers["Content-Type"] = "text/csv"
-    return response
-# ─── Room Management ────────────────────────────────────────────────
+# ─── active-room helpers ────────────────────────────────────────────────
+def get_active_rooms() -> set[str]:
+    return {r.room for r in ActiveRoom.query.all()}
 
-def get_active_rooms():
-    try:
-        with open(ACTIVE_ROOMS_FILE) as f:
-            return set(json.load(f))
-    except:
-        return set()
-
-def activate_room(room):
-    rooms = get_active_rooms()
-    rooms.add(room)
-    with open(ACTIVE_ROOMS_FILE, 'w') as f:
-        json.dump(sorted(rooms), f)
-
-def deactivate_room(room):
-    rooms = get_active_rooms()
-    rooms.discard(room)
-    with open(ACTIVE_ROOMS_FILE, 'w') as f:
-        json.dump(sorted(rooms), f)
+def is_station(name: str) -> bool:
+    config = load_config()
+    return name and not name.isdigit() and name in config.get("stations", [])
 
 
-# ─── Logging ────────────────────────────────────────────────────────
+def activate_room(room: str):
+    if not ActiveRoom.query.get(room):
+        db.session.add(ActiveRoom(room=room))
+        db.session.commit()
 
+def deactivate_room(room: str):
+    rec = ActiveRoom.query.get(room)
+    if rec:
+        db.session.delete(rec)
+        db.session.commit()
+
+def replace_rooms(room_list: list[str]):
+    ActiveRoom.query.delete()
+    db.session.bulk_save_objects([ActiveRoom(room=r) for r in room_list])
+    db.session.commit()
+
+# ─── audit logger (unchanged) ───────────────────────────────────────────
 def log_audit(student_id, reason):
     try:
-        log = AuditLog(student_id=student_id, reason=reason, time=datetime.now())
-        db.session.add(log)
+        db.session.add(AuditLog(student_id=student_id, reason=reason, time=datetime.now()))
         db.session.commit()
-        line = f"[AUDIT] {student_id} - {reason}"
+        line = f"[AUDIT] {student_id} – {reason}"
         print(line)
-        with open(AUDIT_LOG_FILE, "a") as f:
+        os.makedirs(os.path.dirname(AUDIT_LOG_FILE), exist_ok=True)
+        with open(AUDIT_LOG_FILE, "a", encoding="utf-8") as f:
             f.write(line + "\n")
     except Exception as e:
         err = f"[AUDIT ERROR] {e}"
         print(err)
-        with open(AUDIT_LOG_FILE, "a") as f:
-            f.write(err + "\n")
-
-
-# ─── Config Management ──────────────────────────────────────────────
-
+        
+# ─── config + period helpers ───────────────────────────────────────────────
 def load_config():
     try:
-        with open(CONFIG_FILE, 'r') as f:
+        with open('data/config.json') as f:
             config = json.load(f)
             active = config.get("active_schedule", "regular")
             config["period_schedule"] = config.get("schedule_variants", {}).get(active, {})
@@ -68,23 +56,31 @@ def load_config():
     except Exception:
         return {}
 
-
-# ─── Period / Schedule Helpers ──────────────────────────────────────
+config = load_config()
 
 def get_current_period():
-    config = load_config()
+    """Return the current school period based on time and active schedule."""
+    from datetime import datetime
     now = datetime.now().time()
     for period, times in config.get("period_schedule", {}).items():
         start = datetime.strptime(times["start"], "%H:%M").time()
         end = datetime.strptime(times["end"], "%H:%M").time()
         if start <= now <= end:
-            return str(period)
-    return "N/A"
-
+            return period
+    return "0"
 
 def get_room(student_id, period):
-    sp = db.session.query(StudentPeriod).filter_by(
-        student_id=student_id,
-        period=period
-    ).first()
-    return sp.room if sp else None
+    """Get assigned room for a student in a given period."""
+    from src.models import StudentPeriod
+    rec = StudentPeriod.query.filter_by(student_id=student_id, period=period).first()
+    return rec.room if rec else None
+
+# ─── CSV export helper ─────────────────────────────────────────────────────
+from flask import make_response
+
+def csv_response(string_io, filename="export"):
+    """Convert a StringIO buffer to a Flask CSV response."""
+    output = make_response(string_io.getvalue())
+    output.headers["Content-Disposition"] = f"attachment; filename={filename}.csv"
+    output.headers["Content-type"] = "text/csv"
+    return output

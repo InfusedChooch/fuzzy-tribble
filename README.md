@@ -60,9 +60,9 @@ Now includes a desktop GUI launcher with full config editing, audit visibility, 
 ├── README.md
 ├── requirements.txt
 ├── venvinstructions.txt
+├── Worklog.md
 ├── wsgi.py
 ├── data
-│   ├── active_rooms.json
 │   ├── config.json
 │   ├── hallpass.db
 │   ├── station_heartbeat.json
@@ -102,17 +102,20 @@ Now includes a desktop GUI launcher with full config editing, audit visibility, 
 │   │   └── school_logo.png
 │   └── js
 │       ├── admin.js
-│       └── index.js
+│       ├── index.js
+│       └── rooms.js
 └── templates
     ├── admin.html
     ├── admin_login.html
     ├── admin_pass_history.html
     ├── admin_report.html
+    ├── admin_rooms.html
     ├── admin_weekly_summary.html
     ├── index.html
     ├── login.html
     ├── station.html
     └── students.html
+
 ```
 
 ---
@@ -122,35 +125,58 @@ Now includes a desktop GUI launcher with full config editing, audit visibility, 
 ```plaintext
 🖥️ launcher.py — GUI launcher
   ├── scripts/*.py — DB rebuild, student splitter
-  ├── data/config.json — config editing
-  └── wsgi.py / main.py — launches Flask app
+  ├── data/config.json — editable in launcher
+  ├── data/logs/*.csv — exported reports
+  └── wsgi.py / main.py — launches Flask app (Waitress / direct)
 
-🧩 main.py / wsgi.py — App entry
-  └── src/__init__.py — creates Flask app
-      ├── src/routes/* — all route blueprints
-      ├── src/models.py — DB schema (Students, Passes, Logs)
-      └── src/utils.py — config/audit/logging helpers
+🧩 main.py / wsgi.py — App entrypoints
+  └── src/__init__.py — creates and configures the Flask app
+      ├── src/routes/*.py — defines all route blueprints
+      ├── src/models.py — database schema (Students, Passes, Logs)
+      ├── src/utils.py — shared helpers (config, periods, logging)
+      └── src/services/pass_manager.py — core pass lifecycle logic
 
-🌐 src/routes/*.py — Flask endpoints
-  ├── admin.py — dashboards, overrides, exports
-  ├── auth.py — login/logout flow
-  ├── core.py — student passroom logic
-  ├── passlog.py — kiosk check-in/out
-  ├── report.py — summary and CSV exports
-  └── students.py — upload/download roster
+🌐 src/routes/*.py — Flask API + HTML endpoints
+  ├── admin.py — dashboards, room control, exports, pass admin
+  ├── auth.py — login/logout + session auth
+  ├── core.py — student passroom check-in/request logic
+  ├── passlog.py — kiosk station IN/OUT swipes, heartbeat
+  ├── report.py — admin reports (CSV/HTML)
+  └── students.py — upload/download student schedule
 
-🧠 src/services/pass_manager.py — Core pass lifecycle logic
-  └── Used by admin.py + passlog.py
+🧠 src/services/pass_manager.py — Pass lifecycle functions
+  ├── create_pass(), approve_pass(), return_pass(), record_pass_event()
+  └── Used directly by admin.py and passlog.py
 
-🛠️ src/utils.py — Shared tools
-  └── get_current_period(), log_audit(), load_config()
+🛠️ src/utils.py — General utilities
+  ├── get_current_period(), get_room(), log_audit(), load_config()
+  └── Also includes CSV export response wrapper
 
-📄 templates/*.html — Jinja HTML templates
-  └── Used by render_template in each route
+📄 templates/*.html — Jinja2 HTML templates
+  ├── admin.html, login.html, index.html, station.html, etc.
+  └── Used via render_template() in routes
 
-📄 static/js/*.js — Frontend logic
-  ├── admin.js — dashboard timers, override UI
-  └── index.js — student display + clock
+📁 static/js/*.js — JavaScript logic
+  ├── index.js — student display, clock, period sync
+  ├── admin.js — dashboard tables, notes, pass controls
+  └── rooms.js — room manager UI (toggle, rename, stats, reset)
+
+📁 data/ — Runtime data
+  ├── config.json — full configuration (editable)
+  ├── station_heartbeat.json — last check-in timestamps
+  ├── hallpass.db — SQLite database (auto-rebuilt)
+  └── logs/ — audit log + CSV/JSON exports
+
+📁 scripts/ — Admin helper scripts
+  ├── build_student_periods.py — splits masterlist.csv into students.csv and student_periods.csv
+  ├── masterlist.csv — source input
+  └── rebuild_db.py — resets the DB from /Seed data
+
+📁 Seed/ — Initial seed data
+  └── CSVs for students, passes, logs (used by rebuild_db)
+
+🧾 Worklog.md — Dev notes and project TODOs
+
 ```
 
 ---

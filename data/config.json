@@ -57,7 +57,7 @@
         "end": "15:00"
       },
       "12": {
-        "start": "15:03",
+        "start": "15:01",
         "end": "23:45"
       }
     },
@@ -156,6 +156,7 @@
   },
   "max_pass_time_seconds": 2400,
   "passes_available": 2,
+  "station_slots": 3,
   "auto_reset_time": "23:59",
   "theme_color": "#4a90e2",
   "school_name": "TJMS",

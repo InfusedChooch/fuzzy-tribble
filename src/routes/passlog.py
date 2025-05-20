@@ -1,13 +1,13 @@
 # src/routes/passlog.py
 
 from flask import Blueprint, request, session, jsonify, render_template, redirect, url_for
-from datetime import datetime, date
+from datetime import datetime
 import json, os
 
 from src.models import db, Student, Pass, PassEvent
 from src.utils import (
     activate_room, deactivate_room, get_current_period,
-    load_config, log_audit, get_active_rooms
+    load_config, log_audit, get_active_rooms, is_station
 )
 from src.services import pass_manager
 
@@ -23,6 +23,7 @@ config = load_config()
 
 # ------------------------------------------------------------------
 @passlog_bp.route('/station_console', methods=['GET', 'POST'])
+@passlog_bp.route('/station_console', methods=['GET', 'POST'])
 def station_console():
     if 'station_id' not in session:
         return "⛔ Station not set. Please launch from the admin panel.", 403
@@ -30,7 +31,6 @@ def station_console():
     station = session['station_id']
     activate_room(station)
 
-    special_stations = set(config.get('stations', ["Bathroom", "Nurse", "Library", "Office"]))
     current_period = get_current_period()
     message = ""
 
@@ -55,40 +55,45 @@ def station_console():
                     last_event = db.session.query(PassEvent).filter_by(pass_id=active_pass.id)\
                         .order_by(PassEvent.timestamp.desc()).first()
 
+                    # ⛔ BLOCK: re-swipe into same station within 30 seconds of last 'out'
                     if (
                         last_event and
+                        last_event.station == station and
                         last_event.event == "out" and
-                        new_event == "out" and
+                        new_event == "in" and
                         (datetime.utcnow() - last_event.timestamp).total_seconds() < 30
                     ):
-                        message = "Swipe already recorded."
+                        message = "Already swiped out — wait a moment before re-entering."
                     else:
+                        # ✅ Only set room_in if entering a non-origin station for the first time
                         if (
                             new_event == "in" and
-                            station.isdigit() and
+                            not active_pass.room_in and
+                            station != active_pass.origin_room
+                        ):
+                            active_pass.room_in = station
+                            db.session.commit()
+
+                        pass_manager.record_pass_event(active_pass, station, new_event)
+
+                        if new_event == "out" and active_pass.room_in == station:
+                            active_pass.room_in = None
+                            db.session.commit()
+
+                        if (
+                            new_event == "in" and
                             station == active_pass.origin_room and
-                            not active_pass.events
+                            any(l.event == "out" for l in active_pass.events)
                         ):
                             pass_manager.return_pass(active_pass, station=station)
-                            message = f"{student.name}'s override pass ended at room {station}."
+                            message = f"{student.name}'s pass ended at {station}."
                         else:
-                            pass_manager.record_pass_event(active_pass, station, new_event)
-
-                            # Return only if coming back to origin room with valid logs
-                            if (
-                                new_event == "in" and
-                                station == active_pass.origin_room and
-                                any(l.event == "out" for l in active_pass.events)
-                            ):
-                                pass_manager.return_pass(active_pass, station=station)
-                                message = f"{student.name}'s pass ended at {station}."
-                            else:
-                                active_pass.status = STATUS_ACTIVE
-                                db.session.commit()
-                                message = f"{student.name} {new_event} recorded at {station}."
+                            active_pass.status = STATUS_ACTIVE
+                            db.session.commit()
+                            message = f"{student.name} {new_event} recorded at {station}."
             else:
-                # Create new pass if station is a room and not kiosk-only
-                if station.isdigit():
+                # Room (numeric) = self-checkout allowed
+                if not is_station(station):
                     max_passes = config.get("passes_available", 2)
                     active_count = Pass.query.filter_by(
                         date=datetime.now().date(),

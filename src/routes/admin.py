@@ -8,9 +8,9 @@ from flask import (
     redirect, url_for, Response
 )
 from datetime import datetime, date
-from src.models import db, Pass, Student, AuditLog
-from src.utils import activate_room, get_active_rooms, log_audit
-from src.services import pass_manager  # ✅ NEW
+from src.models import db, Pass, Student, AuditLog, ActiveRoom
+from src.utils import activate_room, get_active_rooms, log_audit, deactivate_room, is_station
+from src.services import pass_manager  
 import json, csv, io
 
 admin_bp = Blueprint('admin', __name__)
@@ -321,4 +321,119 @@ def admin_change_password():
         return jsonify({"success": False, "message": f"Error: {e}"})
     
 
+# =================================================================
+
+@admin_bp.route('/admin_rooms_ui')
+def admin_rooms_ui():
+    if not session.get('logged_in'):
+        return redirect(url_for('auth.admin_login'))
+    return render_template('admin_rooms.html')
+
+#----
+@admin_bp.route('/admin_rooms', methods=['GET', 'POST', 'PATCH', 'DELETE'])
+def admin_rooms():
+    if not session.get('logged_in'):
+        return jsonify({'error': 'unauthorized'}), 403
+
+    if request.method == 'GET':
+        passes_available = config.get("passes_available", 3)
+        default_station_slots = config.get("station_slots", 3)
+        data = []
+
+        # ✅ Persist all rooms/stations ever configured or activated
+        configured_rooms = set(config.get("rooms", []))
+        configured_stations = set(config.get("stations", []))
+        active_room_set = get_active_rooms()
+
+        room_set = configured_rooms | configured_stations | active_room_set
+
+        for room in sorted(room_set):
+            is_active = room in active_room_set
+            is_a_station = is_station(room)
+
+            if is_a_station:
+                pending = 0  # stations don't allow pending passes
+                taken = Pass.query.filter_by(room_in=room, status=STATUS_ACTIVE).count()
+                free = max(default_station_slots - taken, 0)
+            else:
+                pending = Pass.query.filter_by(origin_room=room, status=STATUS_PENDING_START).count()
+                taken = Pass.query.filter_by(origin_room=room, status=STATUS_ACTIVE).count()
+                free = max(passes_available - pending - taken, 0)
+
+            checked_in = Pass.query.filter_by(room_in=room, status=STATUS_ACTIVE).count()
+
+            data.append({
+                "room": room,
+                "type": "station" if is_a_station else "room",
+                "active": is_active,
+                "free": free,
+                "pending": pending,
+                "taken": taken,
+                "checked_in": checked_in
+            })
+
+        return jsonify(data)
+
+    # ---------- State-Changing Methods ----------
+    payload = request.get_json(force=True)
+    room = payload.get("room", "").strip()
+    if not room:
+        return jsonify({'error': 'missing room'}), 400
+
+    if request.method == 'POST':
+        activate_room(room)
+        log_audit("admin", f"Activated room {room}")
+        return '', 204
+
+    if request.method == 'PATCH':
+        if payload.get("active"):
+            activate_room(room)
+            log_audit("admin", f"Activated room {room}")
+        else:
+            deactivate_room(room)
+            log_audit("admin", f"Deactivated room {room}")
+        return '', 204
+
+    if request.method == 'DELETE':
+        deactivate_room(room)  # just deactivate — don't remove from config
+        log_audit("admin", f"Removed room {room}")
+        return '', 204
     
+#----
+@admin_bp.route('/admin_rooms/rename', methods=['POST'])
+def rename_room():
+    data = request.get_json(force=True)
+    old = data.get('old')
+    new = data.get('new')
+
+    # for now, ActiveRoom only tracks names — so we remove old, add new
+    if not old or not new:
+        return jsonify({'error': 'Missing room name'}), 400
+
+    from src.models import ActiveRoom
+    rec = ActiveRoom.query.get(old)
+    if rec:
+        db.session.delete(rec)
+        db.session.commit()
+        db.session.add(ActiveRoom(room=new.strip()))
+        db.session.commit()
+        log_audit("admin", f'Renamed room "{old}" → "{new}"')
+        return '', 204
+    return jsonify({'error': 'Room not found'}), 404
+
+#----
+
+@admin_bp.route('/admin_rooms/stats/<room>')
+def room_stats(room):
+    from src.models import Pass
+    today = datetime.now().date()
+    passes_today = Pass.query.filter_by(origin_room=room, date=today).all()
+
+    stats = {
+        "room": room,
+        "count_today": len(passes_today),
+        "active": sum(1 for p in passes_today if p.status in {"active", "pending_start", "pending_return"})
+    }
+    return jsonify(stats)
+#----
+
