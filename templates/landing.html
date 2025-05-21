@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Student Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="{{ url_for('static', filename='js/index.js') }}" defer></script>
+</head>
+<body>
+  <nav style="background: #e4e4e4; padding: 10px 0; display: flex; justify-content: center; gap: 20px; font-size: 1.1em;">
+    {% if student_room %}
+      <a href="{{ url_for('core.passroom_view', room=student_room) }}">📍 Passroom {{ student_room }}</a>
+    {% endif %}
+    <a href="#">📋 View My Passes</a>
+    <a href="#" onclick="openPasswordPopup()">🔒 Change Password</a>
+    <a href="{{ url_for('auth.logout') }}">📕 Logout</a>
+  </nav>
+
+  <h1 id="welcome-msg">Welcome, {{ student_name }}</h1>
+  <h3 id="period">Current Period: {{ current_period }}</h3>
+
+  <div id="custom-clock" class="clock"></div>
+
+  {% if message %}
+    <p style="color: red; font-weight: bold;">{{ message }}</p>
+  {% endif %}
+
+  <h2 style="margin-top: 2em;">Room Status Overview</h2>
+  <div id="room-dot-container" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin-top: 1em;"></div>
+
+</body>
+</html>

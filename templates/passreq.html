@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ school_name }} - Room {{ room }}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/icon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .symbol {
+      font-size: 2em;
+      margin-bottom: 0.5em;
+    }
+  </style>
+</head>
+<body>
+  <nav style="background: #e4e4e4; padding: 10px 0; display: flex; justify-content: center; gap: 20px; font-size: 1.1em;">
+  <a href="{{ url_for('core.student_landing') }}">🏠 Return to Dashboard</a>
+</nav>
+  <h1>{{ school_name }} - Room {{ room }}</h1>
+  <h2 id="welcome-msg"></h2>
+  <h2>Period: {{ current_period }}</h2>
+
+  <div id="pass-grid" class="passes">
+    {% for p in passes %}
+      <div class="pass-box {{ p.status }}">
+        <div class="symbol">
+          {% if p.status == 'free' %}
+            <span class="circle green">O</span>
+          {% elif p.status == 'pending_start' %}
+            <span class="circle blue">■</span>
+          {% else %}
+            <span class="circle red">✕</span>
+          {% endif %}
+        </div>
+
+
+        <div class="status-text">
+          {% if p.student_name %}
+            {{ p.student_name }}
+          {% else %}
+            Open Slot
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <hr>
+
+  {% if session['student_id'] in passes|map(attribute='student_name')|list %}
+    <form id="return-form" method="POST">
+      <input type="hidden" name="student_id" value="{{ session['student_id'] }}">
+      <button type="submit">Return to Room</button>
+    </form>
+  {% else %}
+    <form id="request-form" method="POST">
+      <input type="text" name="student_id" placeholder="Enter your Student ID" required>
+      <button type="submit">Request Pass</button>
+    </form>
+  {% endif %}
+
+  {% if message %}
+    <p style="color: green;" class="message">{{ message }}</p>
+  {% endif %}
+
+
+  <script>
+  function refreshPassGrid() {
+    fetch(window.location.href)
+      .then(response => response.text())
+      .then(html => {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        const newGrid = tempDiv.querySelector('#pass-grid');
+        const oldGrid = document.querySelector('#pass-grid');
+        oldGrid.innerHTML = newGrid.innerHTML;
+      });
+  }
+  setInterval(refreshPassGrid, 5000);
+</script>
+
+<script>
+  window.userName = "{{ session.get('name') or 'User' }}";
+</script>
+
+  <script src="{{ url_for('static', filename='js/index.js') }}"></script>
+  <script> window.userName = "{{ session.get('name', 'User') }}"; </script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+  <script>
+  function refreshPasses() {
+    fetch(window.location.href)
+      .then(response => response.text())
+      .then(html => {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        const newGrid = tempDiv.querySelector('#pass-grid');
+        const oldGrid = document.querySelector('#pass-grid');
+        if (newGrid && oldGrid) oldGrid.innerHTML = newGrid.innerHTML;
+      });
+  }
+
+  setInterval(refreshPasses, 5000);
+</script>
+
+</body>
+</html>

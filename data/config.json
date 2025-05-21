@@ -9,7 +9,8 @@
     "Guidance"
   ],
   "rooms": [
-    "115"
+    "115",
+    "101"
   ],
   "session_timeout_minutes": 60,
   "active_schedule": "regular",

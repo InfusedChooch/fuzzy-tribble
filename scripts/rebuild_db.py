@@ -80,6 +80,7 @@ def rebuild_database():
         # ---------------- passes ------------------ 
         try:
             df = pd.read_csv(os.path.join(SEED_DIR, "passes.csv"))
+            df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.date  # ← ADD THIS LINE
             df["checkout_at"] = df["checkout_at"].apply(parse_dt)
             df["checkin_at"]  = df["checkin_at"].apply(parse_dt)
             db.session.bulk_insert_mappings(Pass, df.to_dict("records"))

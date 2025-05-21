@@ -9,7 +9,7 @@ from flask import (
 )
 from datetime import datetime, date
 from src.models import db, Pass, User, AuditLog, ActiveRoom
-from src.utils import activate_room, get_active_rooms, log_audit, deactivate_room, is_station
+from src.utils import activate_room, get_current_periods, get_active_rooms, log_audit, deactivate_room, is_station
 from src.services import pass_manager  
 import json, csv, io
 
@@ -115,10 +115,14 @@ def admin_passes():
     if not session.get('logged_in'):
         return jsonify({'error': 'Unauthorized'}), 403
 
-    open_passes = Pass.query.filter(
-        Pass.checkin_at == None,
-        Pass.status == STATUS_ACTIVE
-    ).all()
+    query = Pass.query.filter(Pass.checkin_at == None, Pass.status == STATUS_ACTIVE)
+
+    if session.get("role") == "teacher":
+        allowed_rooms = session.get("teacher_rooms", [])
+        query = query.filter(Pass.origin_room.in_(allowed_rooms))
+
+    open_passes = query.all()
+
 
     now = datetime.now()
     response = []
@@ -154,6 +158,7 @@ def admin_passes():
 
 
 # =================================================================
+# =================================================================
 @admin_bp.route('/admin_create_pass', methods=['POST'])
 def admin_create_pass():
     if not session.get('logged_in'):
@@ -171,7 +176,33 @@ def admin_create_pass():
     if Pass.query.filter_by(student_id=student.id, checkin_at=None).first():
         return jsonify({'message': 'User already has an active pass.'})
 
-    pass_manager.create_pass(student.id, room_out, period, is_override=True)
+    # 🆕 Try to set the default return room based on teacher role
+    room_in = None
+    if session.get("role") == "teacher":
+        teacher_id = session.get("teacher_id", session.get("user_id"))
+        if not period:
+            period = get_current_periods()
+        sp = StudentPeriod.query.filter_by(student_id=teacher_id, period=period).first()
+        if sp:
+            room_in = sp.room
+
+    # fallback to origin if valid
+    if not room_in and room_out.isdigit():
+        room_in = room_out
+
+    new_pass = Pass(
+        student_id=student.id,
+        date=datetime.now().date(),
+        period=period,
+        origin_room=room_out,
+        room_in=room_in,
+        checkout_at=datetime.now(),
+        is_override=True,
+        status=STATUS_PENDING_START
+    )
+    db.session.add(new_pass)
+    db.session.commit()
+    log_audit("admin", f"Created override pass for {student.name} from {room_out} returning to {room_in or 'None'}")
     return jsonify({'message': f'Override pass created for {student.name} leaving {room_out}.'})
 
 # =================================================================
@@ -201,6 +232,12 @@ def admin_checkin(pass_id):
     if not p or p.checkin_at:
         return jsonify({'message': 'Invalid or already returned pass'})
 
+    # 🛠️ Ensure room_in is set to origin_room if not already
+    if not p.room_in:
+        p.room_in = p.origin_room
+
+    if not p.room_in:
+        p.room_in = p.origin_room
     success = pass_manager.return_pass(p)
     return jsonify({'message': f'Pass {pass_id} marked as returned.' if success else 'Return failed'})
 
@@ -276,10 +313,17 @@ def admin_pending_passes():
     if not session.get('logged_in'):
         return jsonify({'error': 'Unauthorized'}), 403
 
-    pending = Pass.query.filter(
+    query = Pass.query.filter(
         Pass.status.in_([STATUS_PENDING_START, STATUS_PENDING_RETURN]),
         Pass.checkin_at == None
-    ).all()
+    )
+
+    # 🛡️ Filter for teacher access
+    if session.get("role") == "teacher":
+        allowed_rooms = session.get("teacher_rooms", [])
+        query = query.filter(Pass.origin_room.in_(allowed_rooms))
+
+    pending = query.all()
 
     results = []
     for p in pending:
@@ -293,6 +337,7 @@ def admin_pending_passes():
         })
 
     return jsonify(results)
+
 
 # =================================================================
 @admin_bp.route('/admin_change_password', methods=['POST'])
@@ -346,11 +391,16 @@ def admin_rooms():
     config.setdefault("rooms", [])
     config.setdefault("stations", [])
 
+    role = session.get("role")
+    teacher_rooms = session.get("teacher_rooms", [])
+
     if request.method == 'GET':
         configured_rooms = set(config["rooms"])
         configured_stations = set(config["stations"])
         active_room_set = get_active_rooms()
         room_set = configured_rooms | configured_stations | active_room_set
+        periods = get_current_periods()
+        today = datetime.now().date()
 
         data = []
         for room in sorted(room_set):
@@ -359,11 +409,26 @@ def admin_rooms():
 
             if a_station:
                 pending = 0
-                taken = Pass.query.filter_by(room_in=room, status=STATUS_ACTIVE).count()
+                taken = Pass.query.filter(
+                    Pass.room_in == room,
+                    Pass.status == STATUS_ACTIVE
+                ).count()
                 free = max(default_station_slots - taken, 0)
             else:
-                pending = Pass.query.filter_by(origin_room=room, status=STATUS_PENDING_START).count()
-                taken = Pass.query.filter_by(origin_room=room, status=STATUS_ACTIVE).count()
+                pending = Pass.query.filter(
+                    Pass.origin_room == room,
+                    Pass.period.in_(periods),
+                    Pass.date == today,
+                    Pass.status == STATUS_PENDING_START
+                ).count()
+
+                taken = Pass.query.filter(
+                    Pass.origin_room == room,
+                    Pass.period.in_(periods),
+                    Pass.date == today,
+                    Pass.status == STATUS_ACTIVE
+                ).count()
+
                 free = max(passes_available - pending - taken, 0)
 
             checked_in = Pass.query.filter_by(room_in=room, status=STATUS_ACTIVE).count()
@@ -380,10 +445,16 @@ def admin_rooms():
 
         return jsonify(data)
 
+
     payload = request.get_json(force=True)
     room = payload.get("room", "").strip()
     if not room:
         return jsonify({'error': 'missing room'}), 400
+
+    # 🔐 Teacher permissions — only restrict classrooms
+    if role == "teacher":
+        if not is_station(room, config=config) and room not in teacher_rooms:
+            return jsonify({'error': 'Not authorized for this room'}), 403
 
     if request.method == 'POST':
         activate_room(room)
@@ -407,6 +478,9 @@ def admin_rooms():
         return '', 204
 
     if request.method == 'DELETE':
+        # Only admins can delete rooms
+        if role != "admin":
+            return jsonify({'error': 'Only admins can delete rooms'}), 403
         deactivate_room(room)
         if room in config["rooms"]:
             config["rooms"].remove(room)

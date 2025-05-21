@@ -7,7 +7,7 @@ from sqlalchemy import select
 from src.models import db, User, Pass, StudentPeriod
 from src.utils import (
     load_config,
-    get_current_period,
+    get_current_periods,
     get_room,
     get_active_rooms,
     log_audit
@@ -25,47 +25,43 @@ STATUS_RETURNED       = "returned"
 config = load_config()
 
 # ─────────────────────────────────────────────────────────────────────────────
-@core_bp.route('/index')
-def index():
+@core_bp.route('/student')
+def student_landing():
     if 'student_id' not in session:
-        return redirect(url_for('core.login'))
+        return redirect(url_for('auth.login'))
 
-    student = db.session.get(User, session['student_id'])
+    student_id = session['student_id']
+    student_name = session.get('name', 'Student')
+    periods = get_current_periods()
+    current_period = periods[0] if periods else "0"
+    room = get_room(student_id, current_period)
 
-    # 🔒 Block non-student roles
-    if not student or student.role != "student":
-        return render_template("login.html", error="Unauthorized access. Students only.")
 
-    current_period = get_current_period()
-    current_room = get_room(student.id, current_period)
-
-    if not current_room or current_room.strip() not in get_active_rooms():
-        return render_template("login.html", error=f"Room {current_room} is not accepting passes right now.")
-
-    return redirect(url_for('core.passroom_view', room=current_room.strip()))
-
+    return render_template(
+        'landing.html',
+        student_name=student_name,
+        student_room=room,
+        current_period=current_period
+    )
 
 # ─────────────────────────────────────────────────────────────────────────────
 @core_bp.route('/passroom/<room>', methods=['GET', 'POST'])
 def passroom_view(room):
     if 'student_id' not in session:
-        return redirect(url_for('core.login'))
+        return redirect(url_for('auth.login'))
 
     student = db.session.get(User, session['student_id'])
-
-    # 🔒 Block non-student roles
     if not student or student.role != "student":
-        return render_template('login.html', error="Unauthorized access. Students only.")
+        return redirect(url_for('auth.login'))
 
-    current_period = get_current_period()
+    periods = get_current_periods()
+    current_period = periods[0] if periods else "0"
     scheduled_room = get_room(student.id, current_period)
 
-    if scheduled_room != room:
-        return render_template('login.html', error=f"You are not scheduled for Room {room} this period.")
-
-    if room not in get_active_rooms():
-        log_audit(student.id, f"Attempted to access inactive room: {room}")
-        return render_template('login.html', error=f"Room {room} is not active right now.")
+    if scheduled_room != room or room not in get_active_rooms():
+        log_audit(student.id, f"Denied room access to {room}")
+        session['error_msg'] = f"Room {room} is not accepting passes right now."
+        return redirect(url_for('core.student_landing'))
 
     if request.method == 'POST':
         student_id_form = request.form.get('student_id', '').strip()
@@ -86,6 +82,7 @@ def passroom_view(room):
                     date=datetime.now().date(),
                     period=current_period,
                     origin_room=room,
+                    room_in=room,
                     checkout_at=datetime.now(),
                     status=STATUS_PENDING_START
                 )
@@ -97,26 +94,31 @@ def passroom_view(room):
 
     message = session.pop('passroom_message', '')
 
-    passes = Pass.query.filter_by(
-        date=datetime.now().date(),
-        period=current_period,
-        origin_room=room
-    ).filter(
+    passes = Pass.query.filter(
+        Pass.date == datetime.now().date(),
+        Pass.period.in_(periods),
+        Pass.origin_room == room,
         Pass.checkin_at == None,
         Pass.is_override == False
     ).order_by(Pass.checkout_at).all()
 
-    display_passes = [{
-        "student_name": p.student.name if p.student else None,
-        "status": p.status
-    } for p in passes]
+    display_passes = []
+    for p in passes:
+        student_name = "-"
+        if p.student_id:
+            s = db.session.get(User, p.student_id)
+            if s:
+                student_name = s.name
+        display_passes.append({
+            "student_name": student_name,
+            "status": p.status
+        })
 
-    passes_available = config.get("passes_available", 3)
-    while len(display_passes) < passes_available:
+    while len(display_passes) < config.get("passes_available", 3):
         display_passes.append({"student_name": None, "status": "free"})
 
     return render_template(
-        "index.html",
+        "passreq.html",
         room=room,
         current_period=current_period,
         school_name=config.get("school_name", "TJMS"),
@@ -124,6 +126,47 @@ def passroom_view(room):
         message=message,
         session=session
     )
+
+@core_bp.route('/student_slot_view')
+def student_slot_view():
+    from src.models import Pass
+    from src.utils import (
+        is_station, load_config, get_active_rooms,
+        get_current_periods, get_room
+    )
+    from flask import session, jsonify
+
+    config = load_config()
+    default_slots = config.get("station_slots", 3)
+    student_id = session.get("student_id")
+    periods = get_current_periods()
+    current_period = periods[0] if periods else "0"
+    current_room = get_room(student_id, current_period)
+    active_rooms = get_active_rooms()
+
+    data = []
+    for room in sorted(active_rooms):
+        # Skip all non-station rooms except the student's current one
+        if not is_station(room, config) and room != current_room:
+            continue
+
+        taken = Pass.query.filter_by(room_in=room, status="active").count()
+        free = max(default_slots - taken, 0)
+
+        data.append({
+            "room": room,
+            "free": free,
+            "taken": taken,
+            "pending": 0,
+            "active": True,
+            "type": "station" if is_station(room, config) else "classroom",
+            "is_current": (room == current_room)
+        })
+
+    return jsonify(data)
+
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 @core_bp.route('/debug_period')
 def debug_period():
@@ -158,6 +201,16 @@ def debug_students():
 def debug_audit():
     log_audit("999", "Simulated audit for testing")
     return "✅ Audit triggered", 200
+
+@core_bp.route('/debug_session')
+def debug_session():
+    if not session:
+        return "<p>No session data found.</p>"
+
+    return "<h2>Session Data</h2><ul>" + "".join(
+        f"<li><strong>{k}</strong>: {v}</li>" for k, v in session.items()
+    ) + "</ul>"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 @ping_bp.route('/ping')

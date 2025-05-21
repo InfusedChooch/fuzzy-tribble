@@ -6,7 +6,7 @@ import json, os
 
 from src.models import db, User, Pass, PassEvent
 from src.utils import (
-    activate_room, deactivate_room, get_current_period,
+    activate_room, deactivate_room, get_current_periods,
     load_config, log_audit, get_active_rooms, is_station
 )
 from src.services import pass_manager
@@ -30,7 +30,7 @@ def station_console():
     station = session['station_id']
     activate_room(station)
 
-    current_period = get_current_period()
+    current_period = get_current_periods()
     message = ""
 
     if request.method == 'POST':
@@ -54,7 +54,6 @@ def station_console():
                     last_event = db.session.query(PassEvent).filter_by(pass_id=active_pass.id)\
                         .order_by(PassEvent.timestamp.desc()).first()
 
-                    # ⛔ BLOCK: re-swipe into same station within 30 seconds of last 'out'
                     if (
                         last_event and
                         last_event.station == station and
@@ -64,10 +63,11 @@ def station_console():
                     ):
                         message = "Already swiped out - wait a moment before re-entering."
                     else:
-                        # ✅ Only set room_in if entering a non-origin station for the first time
+                        # ✅ Only set room_in if it's a real station, not a classroom
                         if (
                             new_event == "in" and
                             not active_pass.room_in and
+                            is_station(station, config=config) and
                             station != active_pass.origin_room
                         ):
                             active_pass.room_in = station
@@ -75,15 +75,15 @@ def station_console():
 
                         pass_manager.record_pass_event(active_pass, station, new_event)
 
+                        # 🛠️ Clear room_in if swiping out of a real return station
                         if new_event == "out" and active_pass.room_in == station:
                             active_pass.room_in = None
                             db.session.commit()
 
-                        if (
-                            new_event == "in" and
-                            station == active_pass.origin_room and
-                            any(l.event == "out" for l in active_pass.events)
-                        ):
+                        # ✅ Return to origin room, regardless of prior OUT logs
+                        if new_event == "in" and station == active_pass.origin_room:
+                            if not active_pass.room_in:
+                                active_pass.room_in = station
                             pass_manager.return_pass(active_pass, station=station)
                             message = f"{student.name}'s pass ended at {station}."
                         else:
@@ -91,14 +91,17 @@ def station_console():
                             db.session.commit()
                             message = f"{student.name} {new_event} recorded at {station}."
             else:
-                # Room (numeric) = self-checkout allowed
+                # 🟢 Self-checkout logic for classrooms
                 if not is_station(station):
                     max_passes = config.get("passes_available", 2)
-                    active_count = Pass.query.filter_by(
-                        date=datetime.now().date(),
-                        period=current_period,
-                        origin_room=station
-                    ).filter(Pass.checkin_at == None).count()
+                    periods = get_current_periods()
+                    active_count = Pass.query.filter(
+                        Pass.date == datetime.now().date(),
+                        Pass.period.in_(periods),
+                        Pass.origin_room == station,
+                        Pass.checkin_at == None
+                    ).count()
+
 
                     if active_count >= max_passes:
                         message = f"Max passes reached for Room {station}."

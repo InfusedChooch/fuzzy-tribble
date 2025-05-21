@@ -581,3 +581,162 @@
 [AUDIT] 600 - Attempted to access inactive room: 115
 [AUDIT] 600 - Attempted to access inactive room: 115
 [AUDIT] admin - Activated room 115
+[AUDIT] 900 - Teacher logged in successfully
+[AUDIT] admin - Activated room 115
+[AUDIT] admin - Deactivated room 115
+[AUDIT] 901 - Teacher logged in successfully
+[AUDIT] admin - Activated room 101
+[AUDIT] admin - Activated room 115
+[AUDIT] 600 - Attempted to access inactive room: None
+[AUDIT] admin - Activated room 101
+[AUDIT] admin - Activated room 115
+[AUDIT] 600 - Approved pass 3
+[AUDIT] 600 - Returned pass 3 at room
+[AUDIT] admin - Deactivated room 101
+[AUDIT] admin - Admin logout
+[AUDIT] 900 - Teacher logged in successfully
+[AUDIT] admin - Admin logout
+[AUDIT] admin - Admin logout
+[AUDIT] 900 - Teacher logged in successfully
+[AUDIT] admin - Admin logout
+[AUDIT] 900 - Teacher logged in successfully
+[AUDIT] admin - Deactivated room 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] admin - Activated room 115
+[AUDIT] 600 - Approved pass 4
+[AUDIT] 600 - IN at 115
+[AUDIT] 600 - OUT at 115
+[AUDIT] 600 - Returned pass 4 at room
+[AUDIT] admin - Deactivated room 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] admin - Activated room 115
+[AUDIT] 600 - Checked out from classroom 115
+[AUDIT] 600 - Returned pass 5 at room
+[AUDIT] admin - Admin logout
+[AUDIT] 900 - Teacher logged in successfully
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Activated room 115
+[AUDIT] 600 - Approved pass 6
+[AUDIT] 600 - IN at 115
+[AUDIT] 600 - Returned pass 6 at room
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Admin logout
+[AUDIT] admin - Admin admin logged in successfully
+[AUDIT] admin - Activated room Bathroom
+[AUDIT] admin - Deactivated room Bathroom
+[AUDIT] admin - Admin logout
+[AUDIT] admin - Admin admin logged in successfully
+[AUDIT] 900 - Teacher logged in successfully
+[AUDIT] admin - Activated room 115
+[AUDIT] admin - Activated room Bathroom
+[AUDIT] 600 - Approved pass 7
+[AUDIT] 600 - IN at Bathroom
+[AUDIT] 600 - OUT at Bathroom
+[AUDIT] 600 - IN at 115
+[AUDIT] 600 - Returned pass 7 at 115
+[AUDIT] 600 - Checked out from classroom 115
+[AUDIT] 600 - IN at 115
+[AUDIT] 600 - Returned pass 8 at 115
+[AUDIT] 600 - Approved pass 9
+[AUDIT] 600 - Returned pass 9 at room
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Admin logout
+[AUDIT] admin - Admin logout
+[AUDIT] admin - Admin admin logged in successfully
+[AUDIT] admin - Deactivated room Bathroom
+[AUDIT] 900 - Teacher logged in successfully
+[AUDIT] admin - Activated room Bathroom
+[AUDIT] admin - Activated room 115
+[AUDIT] admin - Deactivated room Bathroom
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Admin logout
+[AUDIT] admin - Activated room 115
+[AUDIT] 600 - Approved pass 10
+[AUDIT] 600 - Returned pass 10 at room
+[AUDIT] 600 - Approved pass 11
+[AUDIT] 600 - Returned pass 11 at room
+[AUDIT] 600 - Rejected pass 12
+[AUDIT] 600 - Approved pass 12
+[AUDIT] 600 - Returned pass 12 at room
+[AUDIT] admin - Deactivated room 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Denied room access to 115
+[AUDIT] 600 - Denied room access to 115
+[AUDIT] admin - Activated room 115
+[AUDIT] 600 - Approved pass 13
+[AUDIT] admin - Activated room Bathroom
+[AUDIT] 600 - IN at Bathroom
+[AUDIT] 600 - OUT at Bathroom
+[AUDIT] admin - Deactivated room Bathroom
+[AUDIT] 600 - Returned pass 13 at room
+[AUDIT] 600 - Student logout
+[AUDIT] 900 - Teacher logged in successfully
+[AUDIT] 900 - Teacher logout
+[AUDIT] 600 - Approved pass 14
+[AUDIT] 600 - Returned pass 14 at room
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Activated room Bathroom
+[AUDIT] admin - Activated room Guidance
+[AUDIT] admin - Activated room Library
+[AUDIT] admin - Activated room 115
+[AUDIT] admin - Deactivated room Bathroom
+[AUDIT] admin - Activated room 101
+[AUDIT] admin - Deactivated room 101
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Deactivated room Guidance
+[AUDIT] admin - Deactivated room Library
+[AUDIT] admin - Activated room 115
+[AUDIT] admin - Activated room Bathroom
+[AUDIT] admin - Activated room Guidance
+[AUDIT] admin - Activated room Library
+[AUDIT] admin - Deactivated room Library
+[AUDIT] admin - Deactivated room Guidance
+[AUDIT] admin - Deactivated room Bathroom
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Activated room 101
+[AUDIT] admin - Activated room 115
+[AUDIT] admin - Activated room Bathroom
+[AUDIT] admin - Activated room Guidance
+[AUDIT] admin - Activated room Library
+[AUDIT] admin - Activated room Nurse
+[AUDIT] admin - Deactivated room 101
+[AUDIT] admin - Deactivated room Bathroom
+[AUDIT] admin - Deactivated room Guidance
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Deactivated room Library
+[AUDIT] admin - Deactivated room Nurse
+[AUDIT] 600 - Student logout
+[AUDIT] admin - Activated room 101
+[AUDIT] admin - Activated room 115
+[AUDIT] admin - Activated room Bathroom
+[AUDIT] admin - Activated room Guidance
+[AUDIT] admin - Activated room Library
+[AUDIT] admin - Activated room Nurse
+[AUDIT] admin - Activated room Office
+[AUDIT] 600 - Student logout

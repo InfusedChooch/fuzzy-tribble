@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
 const btn = document.createElement("button");
-btn.innerHTML = "🌙"; // emoji only
+btn.innerHTML = "🌓"; // emoji only
 btn.title = "Toggle Dark Mode";
 btn.style.position = "fixed";
 btn.style.bottom = "10px";

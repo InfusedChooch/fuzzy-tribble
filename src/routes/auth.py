@@ -1,16 +1,16 @@
 # src/routes/auth.py
 
-from flask import (
-    Blueprint, render_template, request, redirect,
-    url_for, session, current_app
-)
+from flask import (Blueprint, render_template, request, redirect,url_for, session, current_app, jsonify)
 from datetime import timedelta
 import json
+from werkzeug.security import check_password_hash
+from sqlalchemy import func
+
 
 from src.utils import (
     deactivate_room,
     get_active_rooms,
-    get_current_period,
+    get_current_periods,
     get_room,
     log_audit,
     load_config  # ✅ moved from local to utils
@@ -36,11 +36,11 @@ def enforce_session_timeout():
 # ------------------------------------------------------------------
 # Login
 # ------------------------------------------------------------------
-from werkzeug.security import check_password_hash
-from sqlalchemy import func
 
 @auth_bp.route('/', methods=['GET', 'POST'])
 def login():
+    session.clear()  # ✅ Clear any residual session data at the start
+
     if session.get("logged_in"):
         return redirect(url_for('admin.admin_view'))
 
@@ -52,8 +52,10 @@ def login():
         # 🔐 Admin case
         if user_input.lower() == admin_username.lower():
             if password == config.get("admin_password"):
+                session.clear()  # ✅ Double safety
                 session['logged_in'] = True
                 session['role'] = 'admin'
+                session['name'] = 'Admin'  # ✅ Prevent "James G" carryover
                 log_audit("admin", f"Admin {user_input} logged in successfully")
                 return redirect(url_for('admin.admin_view'))
             else:
@@ -70,65 +72,70 @@ def login():
         if not user:
             return render_template('login.html', error="ID or Email not recognized.")
 
-        # ✅ Check password from DB
         if not check_password_hash(user.password, password):
             return render_template('login.html', error="Incorrect password.")
 
-        session['student_id'] = str(user.id)
+        # ✅ Clean slate
+        session.clear()
+        session['name'] = user.name
         session['role'] = user.role
 
         if user.role == "student":
-            current_period = get_current_period()
-            current_room = get_room(user.id, current_period)
-            if not current_room or current_room.strip() not in get_active_rooms():
-                log_audit(user.id, f"Attempted to access inactive room: {current_room}")
-                return render_template('login.html', error=f"Room {current_room} is not accepting passes right now.")
-            return redirect(url_for('core.passroom_view', room=current_room.strip()))
+            session['student_id'] = str(user.id)
+            return redirect(url_for('core.student_landing'))
 
-        # 🔁 Redirect teachers or other roles to future dashboard (placeholder for now)
+        elif user.role == "teacher":
+            from src.models import StudentPeriod
+            assigned = StudentPeriod.query.filter_by(student_id=user.id).all()
+            session['teacher_id'] = str(user.id)
+            session['teacher_rooms'] = list({r.room for r in assigned})
+            session['logged_in'] = True
+            log_audit(user.id, "Teacher logged in successfully")
+            return redirect(url_for('admin.admin_view'))
+
         return render_template('login.html', error="Non-student login not yet implemented.")
 
     return render_template('login.html')
 
 
-# ------------------------------------------------------------------
-# Admin login
-# ------------------------------------------------------------------
-@auth_bp.route('/admin_login', methods=['GET', 'POST'])
-def admin_login():
-    if session.get("logged_in"):
-        return redirect(url_for('admin.admin_view'))
+@auth_bp.route('/change_password', methods=['POST'])
+def change_user_password():
+    user_id = session.get('student_id') or session.get('teacher_id')
+    if not user_id:
+        return jsonify({ "success": False, "message": "Not logged in" }), 403
 
-    if request.method == 'POST':
-        username = request.form.get('username', '').strip().lower()
-        password = request.form.get('password', '').strip()
+    user = db.session.get(User, user_id)
+    data = request.get_json()
+    current = data.get("current_password", "")
+    new = data.get("new_password", "")
+    confirm = data.get("confirm_password", "")
 
-        if (
-            username == config.get('admin_username', '').lower()
-            and password == config.get('admin_password')
-        ):
-            session['logged_in'] = True
-            session['role'] = 'admin'
-            log_audit("admin", f"Admin {username} logged in successfully")
-            return redirect(url_for('admin.admin_view'))
+    from werkzeug.security import check_password_hash, generate_password_hash
+    if not check_password_hash(user.password, current):
+        return jsonify({ "success": False, "message": "Incorrect current password" })
 
-        log_audit("admin", f"Failed admin login by {username}")
-        return render_template('admin_login.html', error='Incorrect username or password.')
+    if new != confirm:
+        return jsonify({ "success": False, "message": "Passwords do not match" })
 
-    return render_template('admin_login.html')
+    user.password = generate_password_hash(new)
+    db.session.commit()
+    return jsonify({ "success": True, "message": "Password changed successfully" })
 
 # ------------------------------------------------------------------
-# Admin logout
+# Logout
 # ------------------------------------------------------------------
-@auth_bp.route('/admin_logout')
-def admin_logout():
-    room = session.pop('admin_station', None)
-    if room:
-        deactivate_room(room)
+@auth_bp.route('/logout')
+def logout():
+    role = session.get("role")
+    user_id = session.get("student_id") or session.get("teacher_id") or "unknown"
 
-    if session.get("logged_in"):
+    if role == "admin":
+        room = session.pop('admin_station', None)
+        if room:
+            deactivate_room(room)
         log_audit("admin", "Admin logout")
+    else:
+        log_audit(user_id, f"{role.capitalize()} logout")
 
-    session.pop('logged_in', None)
-    session.pop('role', None)
+    session.clear()
     return redirect(url_for('auth.login'))

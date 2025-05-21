@@ -65,16 +65,23 @@ def load_config():
 
 config = load_config()
 
-def get_current_period():
-    """Return the current school period based on time and active schedule."""
+def get_current_periods():
+    """Return a list of all periods currently active, including overlapping flex blocks."""
     from datetime import datetime
     now = datetime.now().time()
+    matches = []
+
     for period, times in config.get("period_schedule", {}).items():
-        start = datetime.strptime(times["start"], "%H:%M").time()
-        end = datetime.strptime(times["end"], "%H:%M").time()
-        if start <= now <= end:
-            return period
-    return "0"
+        try:
+            start = datetime.strptime(times["start"], "%H:%M").time()
+            end = datetime.strptime(times["end"], "%H:%M").time()
+            if start <= now <= end:
+                matches.append(period)
+        except Exception as e:
+            print(f"[WARN] Skipping period {period} due to bad time format: {e}")
+
+    return matches
+
 
 def get_room(student_id, period):
     """Get assigned room for a student in a given period."""

@@ -22,16 +22,18 @@
 <body>
 <!-- inside <body> -->
 <h1>Admin Panel</h1>
+<h2 id="welcome-msg"></h2>
 
 <!-- Shared styled clock + period -->
 <div id="custom-clock" class="custom-clock">Loading time…</div>
 <div class="period" id="period">Checking current period...</div>
 
 <nav>
-  <a href="{{ url_for('auth.admin_logout') }}">Logout</a> |
+  <a href="{{ url_for('auth.logout') }}">Logout</a> |
   <a href="{{ url_for('report.admin_pass_history') }}">Pass History</a> |
   <a href="{{ url_for('admin.admin_weekly_summary') }}">View Weekly Summary →</a> |
   <button onclick="location.reload()">🔄 Refresh All</button>
+  <button onclick="openPasswordPopup()">🔒 Change Password</button> |
 </nav>
 
 <!--  Moved Open Stations + Room Manager to here -->
@@ -147,16 +149,12 @@
   </tbody>
 </table>
 
-<!-- Change Admin Password -->
-<h2>Change Admin Password</h2>
-<form id="change-password-form">
-  <input type="password" id="current_pass" placeholder="Current Password" required>
-  <input type="password" id="new_pass" placeholder="New Password" required>
-  <input type="password" id="confirm_pass" placeholder="Confirm New Password" required>
-  <button type="submit">Change Password</button>
-  <p id="password-msg"></p>
-</form>
-
+<script>
+  window.userRole = "{{ session.get('role') }}";
+</script>
+<script>
+  window.userName = "{{ session.get('name', 'User') }}";
+</script>
 <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
 <script type="module" src="{{ url_for('static', filename='js/index.js') }}"></script>
 <script src="{{ url_for('static', filename='js/theme.js') }}"></script>

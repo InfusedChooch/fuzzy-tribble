@@ -67,7 +67,6 @@ def stream_audit_log():
 
     threading.Thread(target=_follow, daemon=True).start()
 
-
 # ─── launch / stop ─────────────────────────────────────────────────────────
 def launch_server(mode: str, port: str, notebook):
     global server_process, current_mode, server_pid
@@ -168,7 +167,6 @@ def stop_server():
         current_mode = None
         server_pid = None
 
-
 def stop_server():
     global server_process, current_mode, server_pid
 
@@ -219,7 +217,7 @@ def run_split_masterlist():
     script = os.path.join(os.path.dirname(__file__), "scripts", "build_student_periods.py")
     try:
         subprocess.run([sys.executable, script], check=True)
-        messagebox.showinfo("Done", "Masterlist split into students.csv and student_periods.csv.")
+        messagebox.showinfo("Done", "Masterlist split into users.csv and student_periods.csv.")
     except subprocess.CalledProcessError as e:
         messagebox.showerror("Failed", f"Split failed: {str(e)}")
 #--------
@@ -300,6 +298,64 @@ def create_routes_tab(notebook, port_var):
 
     load_btn.config(command=load_routes)
 
+def render_password_tab(notebook):
+    tab = ttk.Frame(notebook)
+    notebook.add(tab, text="Admin Password")
+
+    ttk.Label(tab, text="Change Admin Password", font=("Arial", 12, "bold")).pack(pady=10)
+
+    path = os.path.join("data", "config.json")
+    try:
+        with open(path, "r") as f:
+            config = json.load(f)
+    except Exception as e:
+        tk.Label(tab, text=f"Failed to load config.json: {e}", fg="red").pack(pady=10)
+        return
+
+    current_var = tk.StringVar()
+    new_var     = tk.StringVar()
+    confirm_var = tk.StringVar()
+
+    def change_password():
+        current = current_var.get().strip()
+        new     = new_var.get().strip()
+        confirm = confirm_var.get().strip()
+
+        if current != config.get("admin_password"):
+            messagebox.showerror("Error", "Current password incorrect.")
+            return
+        if not new:
+            messagebox.showerror("Error", "New password cannot be empty.")
+            return
+        if new != confirm:
+            messagebox.showerror("Error", "New and confirm password do not match.")
+            return
+
+        config["admin_password"] = new
+        try:
+            with open(path, "w") as f:
+                json.dump(config, f, indent=2)
+            messagebox.showinfo("Success", "Password changed successfully.")
+            current_var.set("")
+            new_var.set("")
+            confirm_var.set("")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save: {e}")
+
+    form = ttk.Frame(tab)
+    form.pack(pady=10)
+
+    for label, var in [
+        ("Current Password", current_var),
+        ("New Password", new_var),
+        ("Confirm New Password", confirm_var)
+    ]:
+        row = ttk.Frame(form)
+        row.pack(anchor="w", pady=5, padx=10)
+        ttk.Label(row, text=label, width=20).pack(side="left")
+        ttk.Entry(row, textvariable=var, show="*", width=30).pack(side="left")
+
+    ttk.Button(tab, text="Change Password", command=change_password).pack(pady=15)
 
 def render_config_editor_tab(notebook):
     tab = ttk.Frame(notebook)
@@ -535,7 +591,8 @@ def build_gui():
     notebook.pack(expand=True, fill="both")
     check_server_health(port_var)
     render_config_editor_tab(notebook)
-    #stream_audit_log()
+    render_password_tab(notebook)
+    stream_audit_log()
 
     def on_close():
         stop_server()  # cleanly kill Flask server
