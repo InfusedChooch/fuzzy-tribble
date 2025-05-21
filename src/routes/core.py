@@ -1,10 +1,18 @@
 # src/routes/core.py
 
 from flask import Blueprint, render_template, request, redirect, url_for, session, jsonify
-from datetime import datetime, date
-from src.models import db, Student, Pass
-from src.utils import get_active_rooms, log_audit
-import json, os
+from datetime import datetime
+from sqlalchemy import select
+
+from src.models import db, Student, Pass, StudentPeriod
+from src.utils import (
+    load_config,
+    get_current_period,
+    get_room,
+    get_active_rooms,
+    log_audit
+)
+# from src.services import pass_manager  # Optional for future refactor
 
 core_bp = Blueprint('core', __name__)
 ping_bp = Blueprint('ping', __name__)
@@ -14,37 +22,9 @@ STATUS_PENDING_RETURN = "pending_return"
 STATUS_ACTIVE         = "active"
 STATUS_RETURNED       = "returned"
 
-# Load config
-def load_config():
-    try:
-        with open('data/config.json') as f:
-            config = json.load(f)
-            active = config.get("active_schedule", "regular")
-            config["period_schedule"] = config.get("schedule_variants", {}).get(active, {})
-            return config
-    except Exception:
-        return {}
-
 config = load_config()
 
-# Period helper
-def get_current_period():
-    now = datetime.now().time()
-    for period, times in config.get("period_schedule", {}).items():
-        start = datetime.strptime(times["start"], "%H:%M").time()
-        end   = datetime.strptime(times["end"], "%H:%M").time()
-        if start <= now <= end:
-            return str(period)
-    return "N/A"
-
-#Audit Log
-def log_audit(student_id, reason):
-    from src.models import db, AuditLog
-    from datetime import datetime
-    log = AuditLog(student_id=student_id, reason=reason, time=datetime.now())
-    db.session.add(log)
-    db.session.commit()
-
+# ─────────────────────────────────────────────────────────────────────────────
 @core_bp.route('/index')
 def index():
     if 'student_id' not in session:
@@ -52,19 +32,14 @@ def index():
 
     student = db.session.get(Student, session['student_id'])
     current_period = get_current_period()
-    current_room = student.schedule.get(current_period)
-
-    # Optional debug statements
-    #print("DEBUG - Period:", current_period)
-    #print("DEBUG - 1Room from schedule:", repr(current_room))
-    #print("DEBUG - Active rooms:", get_active_rooms())
+    current_room = get_room(student.student_id, current_period)
 
     if not current_room or current_room.strip() not in get_active_rooms():
         return render_template("login.html", error=f"Room {current_room} is not accepting passes right now.")
 
     return redirect(url_for('core.passroom_view', room=current_room.strip()))
 
-
+# ─────────────────────────────────────────────────────────────────────────────
 @core_bp.route('/passroom/<room>', methods=['GET', 'POST'])
 def passroom_view(room):
     if 'student_id' not in session:
@@ -72,20 +47,22 @@ def passroom_view(room):
 
     student = db.session.get(Student, session['student_id'])
     current_period = get_current_period()
-    scheduled_room = student.schedule.get(current_period)
+    scheduled_room = get_room(student.student_id, current_period)
 
     if scheduled_room != room:
         return render_template('login.html', error=f"You are not scheduled for Room {room} this period.")
-    log_audit(student.id, f"Attempted to access inactive room: {room}")
+
+
     if room not in get_active_rooms():
+        log_audit(student.student_id, f"Attempted to access inactive room: {room}")
         return render_template('login.html', error=f"Room {room} is not active right now.")
 
     if request.method == 'POST':
         student_id_form = request.form.get('student_id', '').strip()
-        if student_id_form != student.id:
+        if student_id_form != student.student_id:
             session['passroom_message'] = "That ID doesn't match your login."
         else:
-            existing = Pass.query.filter_by(student_id=student.id, checkin_time=None).first()
+            existing = Pass.query.filter_by(student_id=student.student_id, checkin_at=None).first()
             if existing:
                 if existing.status == STATUS_ACTIVE:
                     existing.status = STATUS_PENDING_RETURN
@@ -95,11 +72,11 @@ def passroom_view(room):
                     session['passroom_message'] = "You already have a pending pass."
             else:
                 new_pass = Pass(
-                    student_id=student.id,
+                    student_id=student.student_id,
                     date=datetime.now().date(),
                     period=current_period,
-                    station=room,
-                    checkout_time=datetime.now().time(),
+                    origin_room=room,
+                    checkout_at=datetime.now(),
                     status=STATUS_PENDING_START
                 )
                 db.session.add(new_pass)
@@ -112,11 +89,11 @@ def passroom_view(room):
     passes = Pass.query.filter_by(
         date=datetime.now().date(),
         period=current_period,
-        station=room
+        origin_room=room
     ).filter(
-        Pass.checkin_time == None,
-        Pass.is_override == False  # 🔁 Ignore override passes for display limit
-    ).order_by(Pass.checkout_time).all()
+        Pass.checkin_at == None,
+        Pass.is_override == False
+    ).order_by(Pass.checkout_at).all()
 
     display_passes = [{
         "student_name": p.student.name if p.student else None,
@@ -137,6 +114,7 @@ def passroom_view(room):
         session=session
     )
 
+# ─────────────────────────────────────────────────────────────────────────────
 @core_bp.route('/check', methods=['POST'])
 def deprecated_check():
     return jsonify({'message': 'This endpoint is no longer in use.'}), 410
@@ -168,15 +146,14 @@ def debug_active_rooms():
 @core_bp.route('/debug_students')
 def debug_students():
     students = Student.query.all()
-    return jsonify([{ "id": s.id, "type": str(type(s.id)) } for s in students])
+    return jsonify([{ "id": s.student_id, "type": str(type(s.student_id)) } for s in students])
 
 @core_bp.route("/debug_audit")
 def debug_audit():
-    from src.utils import log_audit
     log_audit("999", "Simulated audit for testing")
     return "✅ Audit triggered", 200
 
-
+# ─────────────────────────────────────────────────────────────────────────────
 @ping_bp.route('/ping')
 def ping():
     return "pong", 200

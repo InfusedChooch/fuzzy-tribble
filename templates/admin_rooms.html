@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Room Manager</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+  table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+  th,td { padding: 0.4em 0.6em; }
+  .dot { width: 14px; height: 14px; border-radius:50%; display:inline-block; margin: 0 2px; }
+  .free { background: #2ecc71; }
+  .pending { background: #3498db; }
+  .taken { background: #e74c3c; }
+  a.room-link {
+    color: #007bff;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  a.room-link:hover {
+    color: #0056b3;
+  }
+</style>
+
+</head>
+
+<body>
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1em;">
+    <h2 style="margin: 0;">Room Manager</h2>
+    <button onclick="addRoom()" style="padding: 6px 12px; font-size: 0.9em;">
+      ➕ Add Room
+    </button>
+  </div>
+
+
+  <button onclick="closeAllRooms()" style="padding: 6px 12px; font-size: 0.9em;">
+  🚪 Close All Rooms
+  </button>
+
+  <table id="room-table" style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr>
+        <th style="text-align: left;">Room</th>
+        <th>Active</th>
+        <th>Slots</th>
+        <th>⋮</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+
+  <script>
+  function openWindowRemembered(path, name) {
+    const key = `windowSettings-${name}`;
+    const settings = JSON.parse(localStorage.getItem(key) || '{}');
+    const width = settings.width || 600;
+    const height = settings.height || 700;
+    const left = settings.left || (window.screenX + 100);
+    const top = settings.top || (window.screenY + 100);
+    const features = `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`;
+
+    const win = window.open(path, name, features);
+    win?.addEventListener('beforeunload', () => {
+      try {
+        localStorage.setItem(key, JSON.stringify({
+          left: win.screenX, top: win.screenY,
+          width: win.outerWidth, height: win.outerHeight
+        }));
+      } catch (e) {}
+    });
+  }
+  </script>
+
+  <script src="{{ url_for('static', filename='js/rooms.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+</body>
+</html>

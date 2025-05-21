@@ -1,28 +1,24 @@
-# routes/auth.py
+# src/routes/auth.py
 
 from flask import (
     Blueprint, render_template, request, redirect,
     url_for, session, current_app
 )
-from datetime import timedelta, datetime
+from datetime import timedelta
 import json
-from src.utils import deactivate_room, get_active_rooms, log_audit
+
+from src.utils import (
+    deactivate_room,
+    get_active_rooms,
+    get_current_period,
+    get_room,
+    log_audit,
+    load_config  # ✅ moved from local to utils
+)
+
 from src.models import db, AuditLog, Student
 
 auth_bp = Blueprint('auth', __name__)
-
-# ------------------------------------------------------------------
-# Config helper
-# ------------------------------------------------------------------
-def load_config():
-    try:
-        with open('data/config.json') as f:
-            config = json.load(f)
-            active = config.get("active_schedule", "regular")
-            config["period_schedule"] = config.get("schedule_variants", {}).get(active, {})
-            return config
-    except Exception:
-        return {}
 
 config = load_config()
 SESSION_TIMEOUT_MIN = config.get("session_timeout_minutes", 60)
@@ -42,15 +38,6 @@ def enforce_session_timeout():
 # ------------------------------------------------------------------
 @auth_bp.route('/', methods=['GET', 'POST'])
 def login():
-    def get_current_period():
-        now = datetime.now().time()
-        for period, times in config.get("period_schedule", {}).items():
-            start = datetime.strptime(times["start"], "%H:%M").time()
-            end = datetime.strptime(times["end"], "%H:%M").time()
-            if start <= now <= end:
-                return str(period)
-        return "N/A"
-
     if session.get("logged_in"):
         return redirect(url_for('admin.admin_view'))
 
@@ -65,28 +52,22 @@ def login():
         if not student:
             return render_template('login.html', error="ID not recognized.")
 
-        session['student_id'] = str(student.id)
+        session['student_id'] = str(student.student_id)
         session['role'] = 'student'
 
         current_period = get_current_period()
-        current_room = student.schedule.get(current_period)
-
-        #print("DEBUG - Period:", current_period)
-        #print("DEBUG - 2Room from schedule:", repr(current_room))
-        #print("DEBUG - Active rooms:", get_active_rooms())
-        log_audit(student.id, f"Attempted to access inactive room")
+        current_room = get_room(student.student_id, current_period)
 
         if not current_room or current_room.strip() not in get_active_rooms():
+            log_audit(student.student_id, f"Attempted to access inactive room: {current_room}")
             return render_template('login.html', error=f"Room {current_room} is not accepting passes right now.")
-        log_audit(student.id, f"Attempted to access inactive room")
-        
 
         return redirect(url_for('core.passroom_view', room=current_room.strip()))
 
     return render_template('login.html')
 
 # ------------------------------------------------------------------
-# Admin login (PATCHED)
+# Admin login
 # ------------------------------------------------------------------
 @auth_bp.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
@@ -103,7 +84,7 @@ def admin_login():
         ):
             session['logged_in'] = True
             session['role'] = 'admin'
-            log_audit("admin",f"Admin {username} logged in successfully")
+            log_audit("admin", f"Admin {username} logged in successfully")
             return redirect(url_for('admin.admin_view'))
 
         log_audit("admin", f"Failed admin login by {username}")
@@ -121,8 +102,8 @@ def admin_logout():
         deactivate_room(room)
 
     if session.get("logged_in"):
-        log_audit("admin","Admin logout")
+        log_audit("admin", "Admin logout")
 
     session.pop('logged_in', None)
     session.pop('role', None)
-    return redirect(url_for('auth.admin_login'))
+    return redirect(url_for('auth.login'))

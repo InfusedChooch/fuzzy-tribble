@@ -3,6 +3,7 @@
 from flask import Flask
 from .models import db
 import os
+from .database import create_app, db     # noqa: F401  (re-export)
 
 def create_app():
     # Resolve base directory for template and static paths

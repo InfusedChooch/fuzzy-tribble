@@ -1,6 +1,7 @@
 # launcher.py
 import tkinter as tk
 import pandas as pd
+import time
 from tkinter import ttk, messagebox
 import threading, subprocess, socket, webbrowser, os, sqlite3, json, csv, sys, signal, shutil
 from datetime import datetime
@@ -41,6 +42,32 @@ def get_exe_path(rel: str):
     base = getattr(sys, "_MEIPASS", os.path.abspath("."))
     return os.path.join(base, rel)
 
+# ─── audit log tailing ─────────────────────────────────────────────────────
+def stream_audit_log():
+    log_path = os.path.join("data", "logs", "console_audit.log")
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+
+    def _follow():
+        try:
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                f.seek(0, os.SEEK_END)
+                while True:
+                    line = f.readline()
+                    if not line:
+                        time.sleep(1)
+                        continue
+                    if console_text:
+                        clean_line = line.replace("â€“", "-").replace("â€”", "-")
+                        console_text.insert(tk.END, clean_line)
+                        console_text.see(tk.END)
+        except Exception as e:
+            if console_text:
+                console_text.insert(tk.END, f"[Audit tail error] {e}\n")
+                console_text.see(tk.END)
+
+    threading.Thread(target=_follow, daemon=True).start()
+
+
 # ─── launch / stop ─────────────────────────────────────────────────────────
 def launch_server(mode: str, port: str, notebook):
     global server_process, current_mode, server_pid
@@ -59,7 +86,7 @@ def launch_server(mode: str, port: str, notebook):
     vpy  = sys.executable
     bundled_srv = os.path.join(os.path.dirname(sys.executable), SERVER_EXE_NAME)
 
-    if os.path.exists(bundled_srv):  # EXE version
+    if os.path.exists(bundled_srv):
         cmd = [bundled_srv, f"--port={port}"]
     else:
         if mode == "main":
@@ -141,6 +168,61 @@ def stop_server():
         current_mode = None
         server_pid = None
 
+
+def stop_server():
+    global server_process, current_mode, server_pid
+
+    if not server_process:
+        log("ℹ️ No server running.")
+        return
+
+    try:
+        if server_process.poll() is not None:
+            log("ℹ️ Server already exited.")
+            server_process = None
+            return
+
+        log(f"🛑 Attempting to stop server (PID {server_pid})…")
+
+        if current_mode == "main" and IS_WINDOWS:
+            log("🛑 Sending CTRL+BREAK")
+            server_process.send_signal(signal.CTRL_BREAK_EVENT)
+        else:
+            log("🛑 Sending terminate()")
+            server_process.terminate()
+
+        try:
+            server_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            log("⚠️ Terminate timeout -forcing kill()")
+            server_process.kill()
+            server_process.wait(timeout=5)
+            log("💥 Forced kill succeeded.")
+
+        log(f"✅ Server process PID {server_pid} stopped.")
+
+    except Exception as exc:
+        log(f"❌ Shutdown error: {exc}")
+    finally:
+        if server_process and server_process.stdout:
+            try:
+                server_process.stdout.close()
+            except Exception as e:
+                log(f"⚠️ Could not close stdout: {e}")
+
+        server_process = None
+        current_mode = None
+        server_pid = None
+
+#-----------
+def run_split_masterlist():
+    script = os.path.join(os.path.dirname(__file__), "scripts", "build_student_periods.py")
+    try:
+        subprocess.run([sys.executable, script], check=True)
+        messagebox.showinfo("Done", "Masterlist split into students.csv and student_periods.csv.")
+    except subprocess.CalledProcessError as e:
+        messagebox.showerror("Failed", f"Split failed: {str(e)}")
+#--------
 
 def create_routes_tab(notebook, port_var):
     tab = ttk.Frame(notebook)
@@ -295,9 +377,9 @@ def render_rebuild_tab(notebook):
             messagebox.showinfo("Done", "Database rebuilt.")
         except subprocess.CalledProcessError as e:
             messagebox.showerror("Failed", str(e))
-
+    ttk.Label(tab, text="Pre-process Seed Files", font=("Arial", 10)).pack(pady=(20, 5))
+    ttk.Button(tab, text="Split Masterlist (Do before rebuild)", command=run_split_masterlist).pack(pady=(2, 20))
     ttk.Button(tab, text="Rebuild Database", command=trigger_rebuild).pack(pady=10)
-
     ttk.Label(tab, text="Export current DB to /data/logs/", font=("Arial", 10)).pack(pady=(30, 5))
 
     def export_from_db():
@@ -305,25 +387,43 @@ def render_rebuild_tab(notebook):
         log_dir = "data/logs"
         os.makedirs(log_dir, exist_ok=True)
         today = datetime.now().strftime("%Y%m%d")
+
         try:
             conn = sqlite3.connect(db_path)
-            pd.read_sql("SELECT * FROM audit_log", conn)\
-                .to_json(os.path.join(log_dir, f"{today}_audit.json"), orient="records", indent=2)
-            df_students = pd.read_sql("SELECT id, name, schedule FROM students", conn)
-            df_students.columns = ["ID", "Name", "Schedule"]  
-            df_students.to_csv(os.path.join(log_dir, f"{today}_masterlist.csv"), index=False)
 
-            df_pass = pd.read_sql("SELECT * FROM passes", conn)
-            df_log = pd.read_sql("SELECT * FROM pass_log", conn)
+            # Export audit_log
+            df_audit = pd.read_sql("SELECT * FROM audit_log", conn)
+            df_audit.to_csv(os.path.join(log_dir, f"{today}_audit_log.csv"), index=False)
+
+            # Export passes
+            df_passes = pd.read_sql("SELECT * FROM passes", conn)
+            df_passes.to_csv(os.path.join(log_dir, f"{today}_passes.csv"), index=False)
+
+            # Export pass events
+            df_events = pd.read_sql("SELECT * FROM pass_events", conn)
+            df_events.to_csv(os.path.join(log_dir, f"{today}_pass_events.csv"), index=False)
+
+            # Export students
+            df_students = pd.read_sql("SELECT * FROM students", conn)
+            df_students.columns = ["ID", "Name"] if "name" in df_students.columns else df_students.columns
+            df_students.to_csv(os.path.join(log_dir, f"{today}_students.csv"), index=False)
+
+            # Export student periods
+            df_periods = pd.read_sql("SELECT * FROM student_periods", conn)
+            df_periods.to_csv(os.path.join(log_dir, f"{today}_student_periods.csv"), index=False)
+
+            # Optional: JSON summary of passes with their logs
             grouped = {}
-            for _, p in df_pass.iterrows():
+            for _, p in df_passes.iterrows():
                 rec = p.to_dict()
-                rec["logs"] = df_log[df_log["pass_id"] == p["id"]][["station", "event_type", "timestamp"]].to_dict("records")
+                rec["logs"] = df_events[df_events["pass_id"] == p["id"]][["station", "event", "timestamp"]].to_dict("records")
                 grouped.setdefault(p["student_id"], []).append(rec)
             with open(os.path.join(log_dir, f"{today}_passlog.json"), "w") as fh:
                 json.dump(grouped, fh, indent=2)
+
             conn.close()
             messagebox.showinfo("Exported", f"Files saved to /data/logs/ with prefix {today}_*")
+
         except Exception as e:
             messagebox.showerror("Export failed", str(e))
 
@@ -357,12 +457,12 @@ def build_gui():
         except Exception as e:
             print(f"Failed to set window icon: {e}")
 
-    
-    root.title("Flask Server Launcher")
+    root.title("Server Launcher")
     root.geometry("1100x700")
     root.minsize(900, 600)
 
     notebook = ttk.Notebook(root)
+
 
     tab_server = ttk.Frame(notebook)
     notebook.add(tab_server, text="Server")
@@ -431,6 +531,14 @@ def build_gui():
     notebook.pack(expand=True, fill="both")
     check_server_health(port_var)
     render_config_editor_tab(notebook)
+    #stream_audit_log()
+
+    def on_close():
+        stop_server()  # cleanly kill Flask server
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", on_close)
+
     root.mainloop()
 
 if __name__ == "__main__":
