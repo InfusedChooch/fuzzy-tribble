@@ -8,7 +8,7 @@ from flask import (
     redirect, url_for, Response
 )
 from datetime import datetime, date
-from src.models import db, Pass, Student, AuditLog, ActiveRoom
+from src.models import db, Pass, User, AuditLog, ActiveRoom
 from src.utils import activate_room, get_active_rooms, log_audit, deactivate_room, is_station
 from src.services import pass_manager  
 import json, csv, io
@@ -54,7 +54,7 @@ def admin_view():
         rec = {
             "id": p.id,
             "student": p.student.name,
-            "student_id": p.student.student_id,
+            "student_id": p.student.id,
             "room": p.room_out,
             "time_out": p.checkout_at.strftime('%H:%M:%S') if p.checkout_at else '-',
             "note": p.note or "",
@@ -83,7 +83,7 @@ def admin_view():
         hallway_time = total_time - station_time if station_time else total_time
 
         recent_returns_data.append({
-            "id": p.student.student_id,
+            "id": p.student.id,
             "student_name": p.student.name,
             "date": p.date.strftime('%Y-%m-%d'),
             "period": p.period,
@@ -135,7 +135,7 @@ def admin_passes():
         response.append({
             "pass_id": p.id,
             "student_name": p.student.name,
-            "student_id": p.student.student_id,
+            "student_id": p.student.id,
             "date": p.date.strftime('%Y-%m-%d'),
             "period": p.period,
             "room_time": f"{p.room_out} @ {p.checkout_at.strftime('%H:%M:%S')}" if p.checkout_at else "-",
@@ -164,14 +164,14 @@ def admin_create_pass():
     period = data.get('period')
     room_out = data.get('room', '').strip() or "OVERRIDE"
 
-    student = db.session.get(Student, student_id)
+    student = db.session.get(User, student_id)
     if not student:
-        return jsonify({'message': 'Student not found.'})
+        return jsonify({'message': 'User not found.'})
 
-    if Pass.query.filter_by(student_id=student.student_id, checkin_at=None).first():
-        return jsonify({'message': 'Student already has an active pass.'})
+    if Pass.query.filter_by(student_id=student.id, checkin_at=None).first():
+        return jsonify({'message': 'User already has an active pass.'})
 
-    pass_manager.create_pass(student.student_id, room_out, period, is_override=True)
+    pass_manager.create_pass(student.id, room_out, period, is_override=True)
     return jsonify({'message': f'Override pass created for {student.name} leaving {room_out}.'})
 
 # =================================================================
@@ -233,8 +233,8 @@ def admin_weekly_summary():
     DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
     report_data = []
 
-    for stu in Student.query.all():
-        records = Pass.query.filter_by(student_id=stu.student_id).all()
+    for stu in User.query.all():
+        records = Pass.query.filter_by(student_id=stu.id).all()
         day_totals = {d: 0 for d in DAYS}
         over_5 = sum(1 for r in records if (r.total_pass_time or 0) > 300)
         over_10 = sum(1 for r in records if (r.total_pass_time or 0) > 600)
@@ -248,7 +248,7 @@ def admin_weekly_summary():
         weekly = ' '.join(f"{d[0]}:{day_totals[d]//60}" for d in DAYS)
         report_data.append({
             "student_name"      : stu.name,
-            "student_id"        : stu.student_id,
+            "student_id"        : stu.id,
             "weekly_report"     : weekly,
             "passes_over_5_min" : over_5,
             "passes_over_10_min": over_10,

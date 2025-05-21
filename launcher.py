@@ -391,33 +391,37 @@ def render_rebuild_tab(notebook):
         try:
             conn = sqlite3.connect(db_path)
 
-            # Export audit_log
-            df_audit = pd.read_sql("SELECT * FROM audit_log", conn)
-            df_audit.to_csv(os.path.join(log_dir, f"{today}_audit_log.csv"), index=False)
+            # Export Users (students + teachers)
+            df_users = pd.read_sql("SELECT * FROM users", conn)
+            df_users.to_csv(os.path.join(log_dir, f"{today}_users.csv"), index=False)
 
-            # Export passes
-            df_passes = pd.read_sql("SELECT * FROM passes", conn)
-            df_passes.to_csv(os.path.join(log_dir, f"{today}_passes.csv"), index=False)
-
-            # Export pass events
-            df_events = pd.read_sql("SELECT * FROM pass_events", conn)
-            df_events.to_csv(os.path.join(log_dir, f"{today}_pass_events.csv"), index=False)
-
-            # Export students
-            df_students = pd.read_sql("SELECT * FROM students", conn)
-            df_students.columns = ["ID", "Name"] if "name" in df_students.columns else df_students.columns
-            df_students.to_csv(os.path.join(log_dir, f"{today}_students.csv"), index=False)
-
-            # Export student periods
+            # Export Student Periods
             df_periods = pd.read_sql("SELECT * FROM student_periods", conn)
             df_periods.to_csv(os.path.join(log_dir, f"{today}_student_periods.csv"), index=False)
 
-            # Optional: JSON summary of passes with their logs
+            # Export Passes
+            df_passes = pd.read_sql("SELECT * FROM passes", conn)
+            df_passes.to_csv(os.path.join(log_dir, f"{today}_passes.csv"), index=False)
+
+            # Export Pass Events
+            df_events = pd.read_sql("SELECT * FROM pass_events", conn)
+            df_events.to_csv(os.path.join(log_dir, f"{today}_pass_events.csv"), index=False)
+
+            # Export Audit Log
+            df_audit = pd.read_sql("SELECT * FROM audit_log", conn)
+            df_audit.to_csv(os.path.join(log_dir, f"{today}_audit_log.csv"), index=False)
+
+            # Export Active Rooms
+            df_active = pd.read_sql("SELECT * FROM active_rooms", conn)
+            df_active.to_csv(os.path.join(log_dir, f"{today}_active_rooms.csv"), index=False)
+
+            # Optional JSON summary: each pass with associated events
             grouped = {}
             for _, p in df_passes.iterrows():
                 rec = p.to_dict()
                 rec["logs"] = df_events[df_events["pass_id"] == p["id"]][["station", "event", "timestamp"]].to_dict("records")
                 grouped.setdefault(p["student_id"], []).append(rec)
+
             with open(os.path.join(log_dir, f"{today}_passlog.json"), "w") as fh:
                 json.dump(grouped, fh, indent=2)
 

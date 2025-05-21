@@ -4,7 +4,7 @@ from flask import Blueprint, request, session, jsonify, render_template, redirec
 from datetime import datetime
 import json, os
 
-from src.models import db, Student, Pass, PassEvent
+from src.models import db, User, Pass, PassEvent
 from src.utils import (
     activate_room, deactivate_room, get_current_period,
     load_config, log_audit, get_active_rooms, is_station
@@ -23,7 +23,6 @@ config = load_config()
 
 # ------------------------------------------------------------------
 @passlog_bp.route('/station_console', methods=['GET', 'POST'])
-@passlog_bp.route('/station_console', methods=['GET', 'POST'])
 def station_console():
     if 'station_id' not in session:
         return "⛔ Station not set. Please launch from the admin panel.", 403
@@ -36,12 +35,12 @@ def station_console():
 
     if request.method == 'POST':
         student_id = request.form.get('student_id', '').strip()
-        student = db.session.get(Student, student_id)
+        student = db.session.get(User, student_id)
 
-        if not student:
-            message = "Invalid student ID"
+        if not student or student.role != "student":
+            message = "Unauthorized user or invalid ID"
         else:
-            active_pass = Pass.query.filter_by(student_id=student.student_id, checkin_at=None).first()
+            active_pass = Pass.query.filter_by(student_id=student.id, checkin_at=None).first()
 
             if active_pass:
                 if active_pass.status == STATUS_PENDING_START:
@@ -105,7 +104,7 @@ def station_console():
                         message = f"Max passes reached for Room {station}."
                     else:
                         new_pass = Pass(
-                            student_id=student.student_id,
+                            student_id=student.id,
                             date=datetime.now().date(),
                             period=current_period,
                             checkout_at=datetime.now(),
@@ -114,7 +113,7 @@ def station_console():
                         )
                         db.session.add(new_pass)
                         db.session.commit()
-                        log_audit(student.student_id, f"Checked out from classroom {station}")
+                        log_audit(student.id, f"Checked out from classroom {station}")
                         message = f"{student.name} checked out from Room {station}."
                 else:
                     message = "You don’t have an active pass to use this station."

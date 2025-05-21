@@ -1,28 +1,29 @@
 <!-- templates/login.html -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Hall Pass Login</title>
+  <title>Unified Login</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/icon.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
-  <h1>Hall Pass Login</h1>
+<body class="login-page">
+  <main>
+    <h1>Hall Pass Login</h1>
 
-  <!-- Shared styled clock + period -->
-  <div id="custom-clock" class="custom-clock">Loading time…</div>
-  <div class="period" id="period">Checking current period...</div>
+    <div id="custom-clock" class="custom-clock">Loading time…</div>
+    <div class="period" id="period">Checking current period...</div>
 
-  <form method="POST">
-    <div><label>Enter Student ID:</label><div>
-    <input type="text" name="user" required>
-    <button type="submit">Continue</button>
-  </form>
+    {% if error %}
+      <p class="error">{{ error }}</p>
+    {% endif %}
 
-  {% if error %}
-    <div class="error">{{ error }}</div>
-  {% endif %}
+    <form method="POST" class="login-form">
+      <input type="text" name="user" placeholder="Enter ID or Email" required><br><br>
+      <input type="password" name="password" placeholder="(Admin only) Password"><br><br>
+      <button type="submit">Login</button>
+    </form>
+  </main>
 
   <script type="module" src="{{ url_for('static', filename='js/index.js') }}"></script>
   <script src="{{ url_for('static', filename='js/theme.js') }}"></script>

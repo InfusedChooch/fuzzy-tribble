@@ -1,62 +1,77 @@
-# scripts/build_student_periods.py
+#!/usr/bin/env python3
 """
-Create student_periods.csv from masterlist.csv
+Split Seed/masterlist.csv →  Seed/users.csv  +  Seed/student_periods.csv
 
-Assumes masterlist.csv header is either:
-    ID,Name,Schedule          – OR –
-    student_id,name,schedule
+• Accepts headers in ANY case:  student_id / ID / id   and   Name / name
+• Adds a 'role' column (default 'student') and raw-ID password.
+• Teachers (role ≠ student) go only to users.csv.
 
-Writes:
-    - student_periods.csv with: student_id,period,room
-    - student_list.csv with:    student_id,name
+Run:
+    python scripts/build_student_periods.py
 """
 
-import csv, json, os, sys
+import csv, json, sys
 from pathlib import Path
 
-SEED_DIR = Path(__file__).resolve().parent.parent / "Seed"
-SCRIPT_DIR = Path(__file__).resolve().parent.parent / "scripts"
+ROOT       = Path(__file__).resolve().parents[1]
+SEED_DIR   = ROOT / "Seed"
+MASTERLIST = SEED_DIR / "masterlist.csv"
 
-def build_periods():
-    src  = SEED_DIR / "masterlist.csv"
-    out_periods = SEED_DIR / "student_periods.csv"
-    out_list    = SEED_DIR / "students.csv"
+USERS_CSV   = SEED_DIR / "users.csv"
+PERIODS_CSV = SEED_DIR / "student_periods.csv"
 
-    if not src.exists():
-        sys.exit("❌ masterlist.csv not found")
 
-    with src.open(newline="") as f_src, \
-         out_periods.open("w", newline="") as f_periods, \
-         out_list.open("w", newline="") as f_list:
+def main() -> None:
+    if not MASTERLIST.exists():
+        sys.exit(f"❌ masterlist.csv not found at {MASTERLIST}")
 
-        reader   = csv.DictReader(f_src)
-        writer_p = csv.writer(f_periods)
-        writer_s = csv.writer(f_list)
+    with (
+        MASTERLIST.open(newline="", encoding="utf-8") as src,
+        USERS_CSV.open("w", newline="", encoding="utf-8") as f_users,
+        PERIODS_CSV.open("w", newline="", encoding="utf-8") as f_periods,
+    ):
+        reader  = csv.DictReader(src)
+        w_user  = csv.writer(f_users)
+        w_per   = csv.writer(f_periods)
 
-        writer_p.writerow(["student_id", "period", "room"])
-        writer_s.writerow(["student_id", "name"])
+        # headers expected by rebuild_db.py
+        w_user.writerow(["id", "name", "email", "role", "password"])
+        w_per.writerow(["student_id", "period", "room"])
 
-        for row in reader:
-            # normalise column names
-            sid   = row.get("student_id") or row.get("ID")
-            name  = row.get("name")       or row.get("Name")
-            blob  = row.get("schedule")   or row.get("Schedule") or "{}"
+        for raw_row in reader:
+            # ---------- lower-case every key once ----------
+            row = {k.strip().lower(): (v or "").strip() for k, v in raw_row.items()}
 
-            # write name list
-            writer_s.writerow([sid.strip(), name.strip()])
+            sid   = row.get("student_id") or row.get("id")
+            name  = row.get("name")
+            email = row.get("email") or f"{sid}@example.org"
+            role  = row.get("role", "student").lower()
+            blob  = row.get("schedule", "{}")
 
-            # parse and write period data
+            if not sid or not name:
+                print(f"⚠️  Skipping row with missing ID/Name → {raw_row}")
+                continue
+
+            # ---------- users.csv ----------
+            w_user.writerow([sid, name, email, role, sid])  # raw ID = default password
+
+            # ---------- student_periods.csv (students only) ----------
+            if role != "student":
+                continue
+
             try:
-                sched = json.loads(blob)
+                sched = json.loads(blob) if blob else {}
             except json.JSONDecodeError:
-                print(f"⚠️  bad JSON for student {sid}; skipping")
+                print(f"⚠️  Bad JSON schedule for {sid}; skipping periods")
                 continue
 
             for period, room in sched.items():
-                writer_p.writerow([sid.strip(), str(period), room.strip()])
+                if period and room:
+                    w_per.writerow([sid, str(period), str(room)])
 
-    print(f"✅ student_periods.csv written → {out_periods}")
-    print(f"✅ student_list.csv written    → {out_list}")
+    print(f"✅ Wrote {USERS_CSV.relative_to(ROOT)}")
+    print(f"✅ Wrote {PERIODS_CSV.relative_to(ROOT)}")
+
 
 if __name__ == "__main__":
-    build_periods()
+    main()

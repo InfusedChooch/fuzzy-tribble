@@ -1,0 +1,20 @@
+id,name,email,role,password
+01,Alice Carter,01@school.com,student,01
+02,Brian Davis,02@school.com,student,02
+03,Chloe Evans,03@school.com,student,03
+04,Daniel Flores,04@school.com,student,04
+05,Emily Garcia,05@school.com,student,05
+06,Frank Harris,06@school.com,student,06
+07,Grace Ingram,07@school.com,student,07
+08,Henry Johnson,08@school.com,student,08
+09,Isla King,09@school.com,student,09
+10,Jack Lee,10@school.com,student,10
+600,James G,600@school.com,student,600
+601,James G2,601@school.com,student,601
+602,James G3,602@school.com,student,602
+603,James G4,603@school.com,student,603
+604,James G5,604@school.com,student,604
+605,James G6,605@school.com,student,605
+900,James Gliem,Teacher@school.com,teacher,900
+901,Peter Quinn,Teacher1@school.com,teacher,901
+902,Rachel Scott,Teacher2@school.com,teacher,902

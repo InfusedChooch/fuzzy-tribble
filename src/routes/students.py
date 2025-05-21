@@ -1,10 +1,11 @@
 # src/routes/students.py
 
 from flask import Blueprint, render_template, request, redirect, url_for, session, Response
-from src.models import db, Student, StudentPeriod
+from src.models import db, User, StudentPeriod
 from src.utils import log_audit, load_config
 import csv
 import io
+from werkzeug.security import generate_password_hash
 
 students_bp = Blueprint('students', __name__)
 config = load_config()
@@ -15,7 +16,7 @@ def manage_students():
     if not session.get('logged_in'):
         return redirect(url_for('auth.admin_login'))
 
-    students = Student.query.all()
+    students = User.query.filter_by(role="student").all()
     return render_template('students.html', students=students)
 
 # ------------------------------------------------------------------
@@ -28,11 +29,11 @@ def download_students_csv():
     writer = csv.writer(output)
     writer.writerow(['ID', 'Name', 'Period', 'Room'])
 
-    students = Student.query.all()
+    students = User.query.filter_by(role="student").all()
     for student in students:
-        periods = StudentPeriod.query.filter_by(student_id=student.student_id).all()
+        periods = StudentPeriod.query.filter_by(student_id=student.id).all()
         for sp in periods:
-            writer.writerow([student.student_id, student.name, sp.period, sp.room])
+            writer.writerow([student.id, student.name, sp.period, sp.room])
 
     output.seek(0)
     return Response(output, mimetype="text/csv", headers={"Content-Disposition": "attachment; filename=students.csv"})
@@ -40,7 +41,7 @@ def download_students_csv():
 # ------------------------------------------------------------------
 @students_bp.route('/students/upload', methods=['POST'])
 def upload_students_csv():
-    if not session.get('logged_in'):
+    if not session.get('logged_in') or session.get('role') != "admin":
         return redirect(url_for('auth.admin_login'))
 
     file = request.files.get('csv_file')
@@ -50,25 +51,33 @@ def upload_students_csv():
     try:
         # Clear existing data
         StudentPeriod.query.delete()
-        Student.query.delete()
+        User.query.filter_by(role="student").delete()
         db.session.commit()
 
         stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
         reader = csv.DictReader(stream)
 
-        student_cache = {}
+        user_cache = {}
         for row in reader:
             student_id = row['ID'].strip()
             name = row['Name'].strip()
             period = str(row['Period']).strip()
             room = str(row['Room']).strip()
 
-            if student_id not in student_cache:
-                student = Student(student_id=student_id, name=name)
+            if student_id not in user_cache:
+                email = f"{student_id}@school.org"
+                password = generate_password_hash(student_id)
+                student = User(
+                    id=student_id,
+                    name=name,
+                    email=email,
+                    role="student",
+                    password=password
+                )
                 db.session.add(student)
-                student_cache[student_id] = student
+                user_cache[student_id] = student
             else:
-                student = student_cache[student_id]
+                student = user_cache[student_id]
 
             sp = StudentPeriod(student_id=student_id, period=period, room=room)
             db.session.add(sp)
@@ -92,9 +101,17 @@ def add_student():
     room = request.form.get('room').strip()
 
     try:
-        student = Student.query.get(student_id)
+        student = User.query.get(student_id)
         if not student:
-            student = Student(student_id=student_id, name=name)
+            email = f"{student_id}@school.org"
+            password = generate_password_hash(student_id)
+            student = User(
+                id=student_id,
+                name=name,
+                email=email,
+                role="student",
+                password=password
+            )
             db.session.add(student)
 
         sp = StudentPeriod(student_id=student_id, period=period, room=room)

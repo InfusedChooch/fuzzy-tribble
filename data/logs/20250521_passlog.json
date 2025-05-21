@@ -1,0 +1,71 @@
+{
+  "600": [
+    {
+      "id": 1,
+      "date": "2025-05-21",
+      "student_id": "600",
+      "checkout_at": "2025-05-21 10:15:12.025671",
+      "checkin_at": "2025-05-21 10:15:41.143536",
+      "period": "3",
+      "origin_room": "115",
+      "room_in": null,
+      "is_override": 0,
+      "note": null,
+      "status": "returned",
+      "total_pass_time": 29,
+      "logs": [
+        {
+          "station": "Bathroom",
+          "event": "in",
+          "timestamp": "2025-05-20 16:12:45.248238"
+        },
+        {
+          "station": "Bathroom",
+          "event": "out",
+          "timestamp": "2025-05-20 16:13:20.072350"
+        },
+        {
+          "station": "Bathroom",
+          "event": "in",
+          "timestamp": "2025-05-21 14:15:24.447822"
+        },
+        {
+          "station": "Bathroom",
+          "event": "out",
+          "timestamp": "2025-05-21 14:15:33.446914"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "date": "2025-05-21",
+      "student_id": "600",
+      "checkout_at": "2025-05-21 10:16:07.254717",
+      "checkin_at": "2025-05-21 10:16:36.200399",
+      "period": "3",
+      "origin_room": "115",
+      "room_in": "115",
+      "is_override": 0,
+      "note": null,
+      "status": "returned",
+      "total_pass_time": 28,
+      "logs": [
+        {
+          "station": "Bathroom",
+          "event": "in",
+          "timestamp": "2025-05-21 14:16:17.620082"
+        },
+        {
+          "station": "Bathroom",
+          "event": "out",
+          "timestamp": "2025-05-21 14:16:26.573928"
+        },
+        {
+          "station": "115",
+          "event": "in",
+          "timestamp": "2025-05-21 14:16:36.170562"
+        }
+      ]
+    }
+  ]
+}

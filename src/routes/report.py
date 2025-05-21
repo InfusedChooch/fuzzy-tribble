@@ -5,10 +5,8 @@ from datetime import datetime
 import csv
 from io import StringIO
 
-from src.models import db, Pass, Student
+from src.models import db, Pass, User
 from src.utils import log_audit, load_config, csv_response
-
-
 
 report_bp = Blueprint('report', __name__)
 config = load_config()
@@ -24,8 +22,8 @@ def admin_report():
 
     report_data = []
 
-    for student in Student.query.all():
-        records = Pass.query.filter_by(student_id=student.student_id).all()
+    for student in User.query.filter_by(role="student"):
+        records = Pass.query.filter_by(student_id=student.id).all()
         day_totals = {d: 0 for d in REPORT_DAYS}
         over_5 = sum(1 for r in records if (r.total_pass_time or 0) > THRESHOLDS["over_5"])
         over_10 = sum(1 for r in records if (r.total_pass_time or 0) > THRESHOLDS["over_10"])
@@ -39,7 +37,7 @@ def admin_report():
         weekly = ' '.join(f"{d[0]}:{day_totals[d]//60}" for d in REPORT_DAYS)
         report_data.append({
             'student_name': student.name,
-            'student_id': student.student_id,
+            'student_id': student.id,
             'weekly_report': weekly,
             'passes_over_5_min': over_5,
             'passes_over_10_min': over_10,
@@ -60,8 +58,8 @@ def admin_report_csv():
 
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 
-    for student in Student.query.all():
-        records = Pass.query.filter_by(student_id=student.student_id).all()
+    for student in User.query.filter_by(role="student"):
+        records = Pass.query.filter_by(student_id=student.id).all()
         day_totals = {d: 0 for d in days}
         over_5 = sum(1 for r in records if (r.total_pass_time or 0) > 300)
         over_10 = sum(1 for r in records if (r.total_pass_time or 0) > 600)
@@ -71,7 +69,7 @@ def admin_report_csv():
                 day_totals[r.date.strftime('%A')] += r.total_pass_time or 0
 
         weekly = ' '.join(f"{d[0]}:{day_totals[d]//60}" for d in days)
-        writer.writerow([student.name, student.student_id, weekly, over_5, over_10])
+        writer.writerow([student.name, student.id, weekly, over_5, over_10])
 
     return csv_response(output, "weekly_report")
 

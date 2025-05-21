@@ -5,7 +5,7 @@ from sqlalchemy import func
 db = SQLAlchemy()
 
 # ---------------------------------------------------------------------
-# Students
+# Students Rooms
 # ---------------------------------------------------------------------
 class ActiveRoom(db.Model):
   
@@ -17,16 +17,24 @@ class ActiveRoom(db.Model):
 # ---------------------------------------------------------------------
 # Students
 # ---------------------------------------------------------------------
-class Student(db.Model):
-    __tablename__ = "students"
+class User(db.Model):
+    __tablename__ = "users"
 
-    student_id       = db.Column(db.String, primary_key=True)           # student ID
-    name     = db.Column(db.String(100), nullable=False)
+    id       = db.Column(db.String, primary_key=True)  # login ID
+    name     = db.Column(db.String, nullable=False)
+    email    = db.Column(db.String, unique=True, nullable=False)
+    role     = db.Column(db.String, nullable=False)  # "student", "teacher"
+    password = db.Column(db.String, nullable=False)
 
-    # relationships
-    passes   = db.relationship("Pass",        backref="student", lazy=True)
-    audits   = db.relationship("AuditLog",    backref="student", lazy=True)
-    periods  = db.relationship("StudentPeriod", backref="student", lazy=True)
+    # ↓ Student-specific relationships
+    passes   = db.relationship("Pass", backref="student", lazy=True, foreign_keys='Pass.student_id')
+    audits   = db.relationship("AuditLog", backref="student", lazy=True, foreign_keys='AuditLog.student_id')
+    periods  = db.relationship("StudentPeriod", backref="student", lazy=True, foreign_keys='StudentPeriod.student_id')
+
+    def check_password(self, raw_password):
+        from werkzeug.security import check_password_hash
+        return check_password_hash(self.password, raw_password)
+
 
 
 class StudentPeriod(db.Model):
@@ -36,7 +44,7 @@ class StudentPeriod(db.Model):
     __tablename__ = "student_periods"
 
     student_id = db.Column(
-        db.String, db.ForeignKey("students.student_id"), primary_key=True
+        db.String, db.ForeignKey("users.id"), primary_key=True
     )
     period     = db.Column(db.String(10), primary_key=True)
     room       = db.Column(db.String(10), nullable=False)
@@ -49,7 +57,7 @@ class Pass(db.Model):
 
     id          = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.Date, default=func.current_date())
-    student_id  = db.Column(db.String, db.ForeignKey("students.student_id"), nullable=False)
+    student_id  = db.Column(db.String, db.ForeignKey("users.id"), nullable=False)
 
     # using full-timestamp columns going forward
     checkout_at = db.Column(db.DateTime(timezone=True), nullable=False)
@@ -148,7 +156,7 @@ class AuditLog(db.Model):
     __tablename__ = "audit_log"
 
     id         = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    student_id = db.Column(db.String, db.ForeignKey("students.student_id"))
+    student_id = db.Column(db.String, db.ForeignKey("users.id"))
     time       = db.Column(db.DateTime(timezone=True),
                            default=datetime.utcnow)
     reason     = db.Column(db.String(255), nullable=False)

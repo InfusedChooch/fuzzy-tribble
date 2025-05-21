@@ -4,7 +4,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 from datetime import datetime
 from sqlalchemy import select
 
-from src.models import db, Student, Pass, StudentPeriod
+from src.models import db, User, Pass, StudentPeriod
 from src.utils import (
     load_config,
     get_current_period,
@@ -30,14 +30,20 @@ def index():
     if 'student_id' not in session:
         return redirect(url_for('core.login'))
 
-    student = db.session.get(Student, session['student_id'])
+    student = db.session.get(User, session['student_id'])
+
+    # 🔒 Block non-student roles
+    if not student or student.role != "student":
+        return render_template("login.html", error="Unauthorized access. Students only.")
+
     current_period = get_current_period()
-    current_room = get_room(student.student_id, current_period)
+    current_room = get_room(student.id, current_period)
 
     if not current_room or current_room.strip() not in get_active_rooms():
         return render_template("login.html", error=f"Room {current_room} is not accepting passes right now.")
 
     return redirect(url_for('core.passroom_view', room=current_room.strip()))
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 @core_bp.route('/passroom/<room>', methods=['GET', 'POST'])
@@ -45,24 +51,28 @@ def passroom_view(room):
     if 'student_id' not in session:
         return redirect(url_for('core.login'))
 
-    student = db.session.get(Student, session['student_id'])
+    student = db.session.get(User, session['student_id'])
+
+    # 🔒 Block non-student roles
+    if not student or student.role != "student":
+        return render_template('login.html', error="Unauthorized access. Students only.")
+
     current_period = get_current_period()
-    scheduled_room = get_room(student.student_id, current_period)
+    scheduled_room = get_room(student.id, current_period)
 
     if scheduled_room != room:
         return render_template('login.html', error=f"You are not scheduled for Room {room} this period.")
 
-
     if room not in get_active_rooms():
-        log_audit(student.student_id, f"Attempted to access inactive room: {room}")
+        log_audit(student.id, f"Attempted to access inactive room: {room}")
         return render_template('login.html', error=f"Room {room} is not active right now.")
 
     if request.method == 'POST':
         student_id_form = request.form.get('student_id', '').strip()
-        if student_id_form != student.student_id:
+        if student_id_form != student.id:
             session['passroom_message'] = "That ID doesn't match your login."
         else:
-            existing = Pass.query.filter_by(student_id=student.student_id, checkin_at=None).first()
+            existing = Pass.query.filter_by(student_id=student.id, checkin_at=None).first()
             if existing:
                 if existing.status == STATUS_ACTIVE:
                     existing.status = STATUS_PENDING_RETURN
@@ -72,7 +82,7 @@ def passroom_view(room):
                     session['passroom_message'] = "You already have a pending pass."
             else:
                 new_pass = Pass(
-                    student_id=student.student_id,
+                    student_id=student.id,
                     date=datetime.now().date(),
                     period=current_period,
                     origin_room=room,
@@ -82,6 +92,7 @@ def passroom_view(room):
                 db.session.add(new_pass)
                 db.session.commit()
                 session['passroom_message'] = "Pass request submitted."
+
         return redirect(url_for('core.passroom_view', room=room))
 
     message = session.pop('passroom_message', '')
@@ -113,12 +124,7 @@ def passroom_view(room):
         message=message,
         session=session
     )
-
 # ─────────────────────────────────────────────────────────────────────────────
-@core_bp.route('/check', methods=['POST'])
-def deprecated_check():
-    return jsonify({'message': 'This endpoint is no longer in use.'}), 410
-
 @core_bp.route('/debug_period')
 def debug_period():
     now = datetime.now().time()
@@ -145,8 +151,8 @@ def debug_active_rooms():
 
 @core_bp.route('/debug_students')
 def debug_students():
-    students = Student.query.all()
-    return jsonify([{ "id": s.student_id, "type": str(type(s.student_id)) } for s in students])
+    students = User.query.all()
+    return jsonify([{ "id": s.id, "type": str(type(s.id)) } for s in students])
 
 @core_bp.route("/debug_audit")
 def debug_audit():

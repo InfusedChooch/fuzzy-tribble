@@ -1,13 +1,16 @@
+# scripts/rebuild_db.py
+
 import os, sys, shutil, csv
 from datetime import datetime, timedelta
 import pandas as pd
+from werkzeug.security import generate_password_hash
 
 # ──────────────────────────── project paths ────────────────────────────
 ROOT_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT_DIR)
 
 from src.database import create_app
-from src.models   import db, Student, StudentPeriod, Pass, PassEvent, AuditLog
+from src.models   import db, User, StudentPeriod, Pass, PassEvent, AuditLog
 
 SEED_DIR  = os.path.join(ROOT_DIR, "Seed")
 DATA_DIR  = os.path.join(ROOT_DIR, "data")
@@ -49,15 +52,24 @@ def rebuild_database():
         db.create_all()
         print("✅ Fresh database created.")
 
-        # ---------------- students ----------------
+        # ---------------- users ----------------
         try:
-            df = pd.read_csv(os.path.join(SEED_DIR, "students.csv"))
-            db.session.bulk_insert_mappings(Student, df.to_dict("records"))
-            print(f"✅ Loaded {len(df)} students.")
-        except Exception as e:
-            print(f"⚠️  students.csv load error: {e}")
+            df = pd.read_csv(os.path.join(SEED_DIR, "users.csv"))
 
-        # -------------- student periods -----------
+            df.columns = [c.strip().lower() for c in df.columns]
+            required_fields = {"id", "name", "email", "role", "password"}
+            missing = required_fields - set(df.columns)
+            if missing:
+                raise ValueError(f"Missing required columns in users.csv: {missing}")
+
+            # Hash passwords
+            df["password"] = df["password"].apply(lambda raw: generate_password_hash(str(raw)))
+            db.session.bulk_insert_mappings(User, df.to_dict("records"))
+            print(f"✅ Loaded {len(df)} users.")
+        except Exception as e:
+            print(f"⚠️  users.csv load error: {e}")
+
+        # -------------- student periods ----------- 
         try:
             df = pd.read_csv(os.path.join(SEED_DIR, "student_periods.csv"))
             db.session.bulk_insert_mappings(StudentPeriod, df.to_dict("records"))
@@ -65,7 +77,7 @@ def rebuild_database():
         except Exception as e:
             print(f"⚠️  student_periods.csv load error: {e}")
 
-        # ---------------- passes ------------------
+        # ---------------- passes ------------------ 
         try:
             df = pd.read_csv(os.path.join(SEED_DIR, "passes.csv"))
             df["checkout_at"] = df["checkout_at"].apply(parse_dt)
@@ -77,7 +89,7 @@ def rebuild_database():
         except Exception as e:
             print(f"⚠️  passes.csv load error: {e}")
 
-        # ------------- pass events ----------------
+        # ------------- pass events ---------------- 
         try:
             df = pd.read_csv(os.path.join(SEED_DIR, "pass_events.csv"))
             df["timestamp"] = df["timestamp"].apply(parse_dt)
@@ -88,7 +100,7 @@ def rebuild_database():
         except Exception as e:
             print(f"⚠️  pass_events.csv load error: {e}")
 
-        # -------------- audit log -----------------
+        # -------------- audit log ----------------- 
         try:
             df = pd.read_csv(os.path.join(SEED_DIR, "audit_log.csv"))
             df["time"] = df["time"].apply(parse_dt)

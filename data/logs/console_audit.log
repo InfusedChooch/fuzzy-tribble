@@ -552,3 +552,32 @@
 [AUDIT] admin - Admin admin logged in successfully
 [AUDIT] admin - Admin logout
 [AUDIT] admin - Admin admin logged in successfully
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] admin - Admin admin logged in successfully
+[AUDIT] admin - Activated room 115
+[AUDIT] admin - Admin logout
+[AUDIT] admin - Admin admin logged in successfully
+[AUDIT] 600 - Approved pass 1
+[AUDIT] admin - Activated room Bathroom
+[AUDIT] 600 - IN at Bathroom
+[AUDIT] 600 - OUT at Bathroom
+[AUDIT] 600 - Returned pass 1 at room
+[AUDIT] 600 - Approved pass 2
+[AUDIT] 600 - IN at Bathroom
+[AUDIT] 600 - OUT at Bathroom
+[AUDIT] 600 - IN at 115
+[AUDIT] 600 - Returned pass 2 at 115
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Deactivated room Bathroom
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] admin - Activated room 115

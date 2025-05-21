@@ -16,7 +16,6 @@ def get_app():
 if __name__ == "__main__":
     app = get_app()
 
-    Thread(target=cleanup_inactive_rooms, daemon=True).start()
 
     debug_enabled = os.getenv("DEBUG", "").lower() in {"1", "true", "yes"}
 

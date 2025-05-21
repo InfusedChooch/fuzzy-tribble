@@ -16,7 +16,7 @@ from src.utils import (
     load_config  # ✅ moved from local to utils
 )
 
-from src.models import db, AuditLog, Student
+from src.models import db, AuditLog, User
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -36,35 +36,60 @@ def enforce_session_timeout():
 # ------------------------------------------------------------------
 # Login
 # ------------------------------------------------------------------
+from werkzeug.security import check_password_hash
+from sqlalchemy import func
+
 @auth_bp.route('/', methods=['GET', 'POST'])
 def login():
     if session.get("logged_in"):
         return redirect(url_for('admin.admin_view'))
 
     if request.method == 'POST':
-        user = request.form['user'].strip()
+        user_input = request.form.get('user', '').strip()
+        password = request.form.get('password', '').strip()
         admin_username = config.get("admin_username", "admin")
 
-        if user.lower() == admin_username.lower():
-            return redirect(url_for('auth.admin_login'))
+        # 🔐 Admin case
+        if user_input.lower() == admin_username.lower():
+            if password == config.get("admin_password"):
+                session['logged_in'] = True
+                session['role'] = 'admin'
+                log_audit("admin", f"Admin {user_input} logged in successfully")
+                return redirect(url_for('admin.admin_view'))
+            else:
+                log_audit("admin", f"Failed admin login by {user_input}")
+                return render_template('login.html', error="Incorrect admin password.")
 
-        student = db.session.get(Student, user)
-        if not student:
-            return render_template('login.html', error="ID not recognized.")
+        # 🔐 User case (email or ID)
+        user = None
+        if "@" in user_input:
+            user = User.query.filter(func.lower(User.email) == user_input.lower()).first()
+        else:
+            user = db.session.get(User, user_input)
 
-        session['student_id'] = str(student.student_id)
-        session['role'] = 'student'
+        if not user:
+            return render_template('login.html', error="ID or Email not recognized.")
 
-        current_period = get_current_period()
-        current_room = get_room(student.student_id, current_period)
+        # ✅ Check password from DB
+        if not check_password_hash(user.password, password):
+            return render_template('login.html', error="Incorrect password.")
 
-        if not current_room or current_room.strip() not in get_active_rooms():
-            log_audit(student.student_id, f"Attempted to access inactive room: {current_room}")
-            return render_template('login.html', error=f"Room {current_room} is not accepting passes right now.")
+        session['student_id'] = str(user.id)
+        session['role'] = user.role
 
-        return redirect(url_for('core.passroom_view', room=current_room.strip()))
+        if user.role == "student":
+            current_period = get_current_period()
+            current_room = get_room(user.id, current_period)
+            if not current_room or current_room.strip() not in get_active_rooms():
+                log_audit(user.id, f"Attempted to access inactive room: {current_room}")
+                return render_template('login.html', error=f"Room {current_room} is not accepting passes right now.")
+            return redirect(url_for('core.passroom_view', room=current_room.strip()))
+
+        # 🔁 Redirect teachers or other roles to future dashboard (placeholder for now)
+        return render_template('login.html', error="Non-student login not yet implemented.")
 
     return render_template('login.html')
+
 
 # ------------------------------------------------------------------
 # Admin login
