@@ -1,28 +1,55 @@
-/* style.css */
+/* style.css — supports light/dark mode */
+
+:root {
+  --bg: #f9f9f9;
+  --text: #333;
+  --card-bg: white;
+  --link: #2a5bd7;
+  --link-hover: #1e40af;
+  --btn-bg: #4a90e2;
+  --btn-hover: #357ab8;
+  --border: #ccc;
+  --error: red;
+  --table-header: #e4e4e4;
+}
+
+body.dark {
+  --bg: #121212;
+  --text: #eee;
+  --card-bg: #1f1f1f;
+  --link: #9ecbff;
+  --link-hover: #73b4ff;
+  --btn-bg: #3a71c1;
+  --btn-hover: #2a5692;
+  --border: #555;
+  --error: #ff6b6b;
+  --table-header: #2a2a2a;
+}
 
 body {
   font-family: Arial, sans-serif;
   margin: 0;
   padding: 20px;
-  background: #f9f9f9;
-  color: #333;
+  background: var(--bg);
+  color: var(--text);
   text-align: center;
 }
 
 h1, h2 {
   margin-top: 10px;
   margin-bottom: 20px;
-  color: #2a2a2a;
+  color: var(--text);
 }
 
 a {
-  color: #2a5bd7;
+  color: var(--link);
   text-decoration: none;
   margin: 0 10px;
 }
 
 a:hover {
   text-decoration: underline;
+  color: var(--link-hover);
 }
 
 nav {
@@ -33,7 +60,7 @@ button {
   padding: 10px 20px;
   font-size: 1em;
   border: none;
-  background-color: #4a90e2;
+  background-color: var(--btn-bg);
   color: white;
   border-radius: 4px;
   cursor: pointer;
@@ -41,7 +68,7 @@ button {
 }
 
 button:hover {
-  background-color: #357ab8;
+  background-color: var(--btn-hover);
 }
 
 input[type="text"],
@@ -49,11 +76,13 @@ input[type="password"],
 input[type="file"] {
   padding: 8px;
   margin: 5px 0;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border);
   border-radius: 4px;
   font-size: 1em;
   width: 100%;
   max-width: 300px;
+  background-color: var(--card-bg);
+  color: var(--text);
 }
 
 form {
@@ -61,32 +90,32 @@ form {
 }
 
 .error {
-  color: red;
+  color: var(--error);
   font-weight: bold;
 }
 
 .message {
   font-weight: bold;
   margin: 10px 0;
-  color: #444;
+  color: var(--text);
 }
 
 table {
   margin: auto;
   border-collapse: collapse;
   width: 95%;
-  background: #fff;
+  background: var(--card-bg);
 }
 
 th, td {
-  border: 1px solid #ccc;
+  border: 1px solid var(--border);
   padding: 10px;
   text-align: center;
   vertical-align: middle;
 }
 
 th {
-  background: #e4e4e4;
+  background: var(--table-header);
 }
 
 .passes {
@@ -101,7 +130,7 @@ th {
 .pass-box {
   width: 160px;
   height: 160px;
-  border: 3px solid #333;
+  border: 3px solid var(--text);
   border-radius: 10px;
   display: flex;
   flex-direction: column;
@@ -110,17 +139,18 @@ th {
   font-size: 1.2em;
   position: relative;
   margin: 10px;
-  color: #222;
+  color: var(--text);
+  background: var(--card-bg);
 }
 
 .pass-box.free           { background-color: #dfffdf; }  /* Green */
 .pass-box.pending_start  { background-color: #cfe2ff; }  /* Blue */
 .pass-box.pending_return { background-color: #fff3cd; }  /* Yellow */
 .pass-box.active         { background-color: #ffd6d6; }  /* Light Red */
-.dot.free { background: #2ecc71; }    /* green */
-.dot.pending { background: #3498db; } /* blue */
-.dot.taken { background: #e74c3c; }   /* red */
 
+.dot.free    { background: #2ecc71; }
+.dot.pending { background: #3498db; }
+.dot.taken   { background: #e74c3c; }
 
 .symbol {
   font-size: 2.2em;
@@ -133,19 +163,7 @@ th {
   margin-bottom: 0.4em;
 }
 
-.custom-clock {
-  background-color: black;
-  color: yellow;
-  border: 2px dotted yellow;
-  font-family: sans-serif;
-  font-style: italic;
-  font-weight: bold;
-  font-size: 1.1em;
-  padding: 10px 20px;
-  display: inline-block;
-  margin: 1em auto;
-}
-
+.custom-clock,
 .clock {
   background-color: black;
   color: yellow;
@@ -158,7 +176,6 @@ th {
   display: inline-block;
   margin: 1em auto;
 }
-
 
 .pending-row tr {
   background: #cfe2ff;

@@ -544,3 +544,11 @@
 [AUDIT] admin - Deactivated room 115
 [AUDIT] admin - Activated room 115
 [AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Admin logout
+[AUDIT] 600 - Attempted to access inactive room: 115
+[AUDIT] admin - Admin admin logged in successfully
+[AUDIT] admin - Admin logout
+[AUDIT] admin - Failed admin login by admin
+[AUDIT] admin - Admin admin logged in successfully
+[AUDIT] admin - Admin logout
+[AUDIT] admin - Admin admin logged in successfully
