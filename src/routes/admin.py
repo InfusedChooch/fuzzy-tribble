@@ -8,7 +8,7 @@ from flask import (
     redirect, url_for, Response
 )
 from datetime import datetime, date
-from src.models import db, Pass, User, AuditLog, ActiveRoom
+from src.models import db, Pass, User, StudentPeriod
 from src.utils import activate_room, get_current_periods, get_active_rooms, log_audit, deactivate_room, is_station
 from src.services import pass_manager  
 import json, csv, io
@@ -41,7 +41,7 @@ def save_config(cfg: dict):
 @admin_bp.route('/admin')
 def admin_view():
     if not session.get('logged_in'):
-        return redirect(url_for('auth.admin_login'))
+        return redirect(url_for('auth.login'))
 
     open_passes = Pass.query.filter(
         Pass.status.in_([STATUS_ACTIVE, STATUS_PENDING_START, STATUS_PENDING_RETURN]),
@@ -98,6 +98,14 @@ def admin_view():
             "override": "✔️" if p.is_override else ""
         })
 
+    # 🧠 Check if teacher needs to set up their schedule
+    needs_setup = False
+    if session.get("role") == "teacher":
+        from src.models import TeacherSchedule
+        sched = TeacherSchedule.query.filter_by(teacher_id=session.get("teacher_id")).first()
+        if not sched or not any(getattr(sched, f"period_{i}", None) for i in range(13)):
+            needs_setup = True
+
     return render_template(
         "admin.html",
         pending_starts=pending_starts,
@@ -106,7 +114,8 @@ def admin_view():
         recent_returns=recent_returns_data,
         active_rooms=get_active_rooms(),
         admin_station=session.get("station_id", ""),
-        config_stations=config.get("stations", [])
+        config_stations=config.get("stations", []),
+        needs_schedule_setup=needs_setup
     )
 
 # =================================================================
@@ -160,6 +169,7 @@ def admin_passes():
 # =================================================================
 # =================================================================
 @admin_bp.route('/admin_create_pass', methods=['POST'])
+
 def admin_create_pass():
     if not session.get('logged_in'):
         return jsonify({'message': 'Unauthorized'}), 403
@@ -176,15 +186,19 @@ def admin_create_pass():
     if Pass.query.filter_by(student_id=student.id, checkin_at=None).first():
         return jsonify({'message': 'User already has an active pass.'})
 
-    # 🆕 Try to set the default return room based on teacher role
+    # 🆕 Try to set the default return room based on teacher schedule
     room_in = None
     if session.get("role") == "teacher":
         teacher_id = session.get("teacher_id", session.get("user_id"))
         if not period:
-            period = get_current_periods()
-        sp = StudentPeriod.query.filter_by(student_id=teacher_id, period=period).first()
-        if sp:
-            room_in = sp.room
+            current_periods = get_current_periods()
+            period = current_periods[0] if current_periods else "0"
+
+        from src.models import TeacherSchedule
+        ts = TeacherSchedule.query.filter_by(teacher_id=teacher_id).first()
+        if ts:
+            safe_period = f"period_{period.replace('/', '_')}"
+            room_in = getattr(ts, safe_period, None)
 
     # fallback to origin if valid
     if not room_in and room_out.isdigit():
@@ -265,7 +279,7 @@ def admin_add_note(student_id):
 @admin_bp.route('/admin_weekly_summary')
 def admin_weekly_summary():
     if not session.get('logged_in'):
-        return redirect(url_for('auth.admin_login'))
+        return redirect(url_for('auth.login'))
 
     DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
     report_data = []
@@ -376,7 +390,7 @@ def admin_change_password():
 @admin_bp.route('/admin_rooms_ui')
 def admin_rooms_ui():
     if not session.get('logged_in'):
-        return redirect(url_for('auth.admin_login'))
+        return redirect(url_for('auth.login'))
     return render_template('admin_rooms.html')
 
 #----
@@ -527,4 +541,31 @@ def room_stats(room):
     }
     return jsonify(stats)
 #----
+# =================================================================
+@admin_bp.route('/setup_schedule', methods=['POST'])
+def setup_schedule():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "message": "Only teachers may edit their schedule."}), 403
+
+    from src.models import TeacherSchedule
+    teacher_id = session.get("teacher_id")
+    if not teacher_id:
+        return jsonify({"success": False, "message": "Missing teacher ID."}), 400
+
+    data = request.get_json()
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "message": "Invalid data format."}), 400
+
+    schedule = TeacherSchedule.query.filter_by(teacher_id=teacher_id).first()
+    if not schedule:
+        schedule = TeacherSchedule(teacher_id=teacher_id)
+        db.session.add(schedule)
+
+    for key, val in data.items():
+        if key.startswith("period_"):
+            setattr(schedule, key, val.strip() if val else None)
+
+    db.session.commit()
+    log_audit(teacher_id, "Updated their schedule via popup")
+    return jsonify({"success": True, "message": "Schedule updated."})
 

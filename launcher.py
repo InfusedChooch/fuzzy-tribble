@@ -8,6 +8,7 @@ from datetime import datetime
 from collections import defaultdict
 from importlib import import_module
 import contextlib
+from functools import partial
 
 # ─── set‑up ────────────────────────────────────────────────────────────────
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "vendor"))
@@ -46,6 +47,10 @@ def get_exe_path(rel: str):
 def stream_audit_log():
     log_path = os.path.join("data", "logs", "console_audit.log")
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
+
+    if not os.path.exists(log_path):
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write("🔍 Audit log initialized.\n")
 
     def _follow():
         try:
@@ -167,81 +172,129 @@ def stop_server():
         current_mode = None
         server_pid = None
 
-def stop_server():
-    global server_process, current_mode, server_pid
+# ─── GUI Builder ────────────────────────────────────────────────────────────
 
-    if not server_process:
-        log("ℹ️ No server running.")
+# --- Merge of Config Editor + Password Tab ---
+def render_settings_tab(notebook):
+    tab = ttk.Frame(notebook)
+    notebook.add(tab, text="Settings")
+    path = os.path.join("data", "config.json")
+
+    try:
+        with open(path, "r") as f:
+            config = json.load(f)
+    except Exception as e:
+        tk.Label(tab, text=f"Failed to load config.json: {e}", fg="red").pack(pady=10)
         return
 
-    try:
-        if server_process.poll() is not None:
-            log("ℹ️ Server already exited.")
-            server_process = None
+    # --- Config Editor Section ---
+    config_frame = ttk.LabelFrame(tab, text="Configuration")
+    config_frame.pack(fill="x", padx=10, pady=10)
+
+    fields = [
+        ("School Name", "school_name"),
+        ("Theme Color (hex)", "theme_color"),
+        ("Passes Available", "passes_available"),
+        ("Max Pass Time (seconds)", "max_pass_time_seconds"),
+        ("Auto Reset Time (HH:MM)", "auto_reset_time"),
+        ("Session Timeout (min)", "session_timeout_minutes"),
+    ]
+
+    widgets = {}
+    for label_text, key in fields:
+        frame = ttk.Frame(config_frame)
+        frame.pack(anchor="w", padx=10, pady=4)
+        ttk.Label(frame, text=label_text, width=25).pack(side="left")
+        val = config.get(key, "")
+        var = tk.StringVar(value=str(val))
+        ttk.Entry(frame, textvariable=var, width=40).pack(side="left")
+        widgets[key] = var
+
+    def save_config():
+        try:
+            for k, var in widgets.items():
+                val = var.get().strip()
+                if k in ["passes_available", "max_pass_time_seconds", "session_timeout_minutes"]:
+                    config[k] = int(val)
+                else:
+                    config[k] = val
+            with open(path, "w") as f:
+                json.dump(config, f, indent=2)
+            messagebox.showinfo("Saved", "Configuration updated.")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    ttk.Button(config_frame, text="Save Config", command=save_config).pack(pady=5)
+
+    # --- Admin Password Section ---
+    password_frame = ttk.LabelFrame(tab, text="Change Admin Password")
+    password_frame.pack(fill="x", padx=10, pady=10)
+
+    current_var = tk.StringVar()
+    new_var     = tk.StringVar()
+    confirm_var = tk.StringVar()
+
+    def change_password():
+        current = current_var.get().strip()
+        new     = new_var.get().strip()
+        confirm = confirm_var.get().strip()
+
+        if current != config.get("admin_password"):
+            messagebox.showerror("Error", "Current password incorrect.")
+            return
+        if not new:
+            messagebox.showerror("Error", "New password cannot be empty.")
+            return
+        if new != confirm:
+            messagebox.showerror("Error", "New and confirm password do not match.")
             return
 
-        log(f"🛑 Attempting to stop server (PID {server_pid})…")
-
-        if current_mode == "main" and IS_WINDOWS:
-            log("🛑 Sending CTRL+BREAK")
-            server_process.send_signal(signal.CTRL_BREAK_EVENT)
-        else:
-            log("🛑 Sending terminate()")
-            server_process.terminate()
-
+        config["admin_password"] = new
         try:
-            server_process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            log("⚠️ Terminate timeout -forcing kill()")
-            server_process.kill()
-            server_process.wait(timeout=5)
-            log("💥 Forced kill succeeded.")
+            with open(path, "w") as f:
+                json.dump(config, f, indent=2)
+            messagebox.showinfo("Success", "Password changed successfully.")
+            current_var.set("")
+            new_var.set("")
+            confirm_var.set("")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save: {e}")
 
-        log(f"✅ Server process PID {server_pid} stopped.")
+    for label, var in [
+        ("Current Password", current_var),
+        ("New Password", new_var),
+        ("Confirm New Password", confirm_var)
+    ]:
+        row = ttk.Frame(password_frame)
+        row.pack(anchor="w", pady=5, padx=10)
+        ttk.Label(row, text=label, width=20).pack(side="left")
+        ttk.Entry(row, textvariable=var, show="*", width=30).pack(side="left")
 
-    except Exception as exc:
-        log(f"❌ Shutdown error: {exc}")
-    finally:
-        if server_process and server_process.stdout:
-            try:
-                server_process.stdout.close()
-            except Exception as e:
-                log(f"⚠️ Could not close stdout: {e}")
+    ttk.Button(password_frame, text="Change Password", command=change_password).pack(pady=10)
 
-        server_process = None
-        current_mode = None
-        server_pid = None
-
-#-----------
-def run_split_masterlist():
-    script = os.path.join(os.path.dirname(__file__), "scripts", "build_student_periods.py")
-    try:
-        subprocess.run([sys.executable, script], check=True)
-        messagebox.showinfo("Done", "Masterlist split into users.csv and student_periods.csv.")
-    except subprocess.CalledProcessError as e:
-        messagebox.showerror("Failed", f"Split failed: {str(e)}")
-#--------
-
-def create_routes_tab(notebook, port_var):
+# --- Merge of Rebuild + Route Preview ---
+def render_maintenance_tab(notebook, port_var):
     tab = ttk.Frame(notebook)
-    notebook.add(tab, text="All Routes")
+    notebook.add(tab, text="Maintenance")
 
-    btn_frame = ttk.Frame(tab)
-    btn_frame.pack(anchor="w", pady=8, padx=8)
+    # --- Route Preview Section ---
+    route_frame = ttk.LabelFrame(tab, text="Flask Routes")
+    route_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+    btn_frame = ttk.Frame(route_frame)
+    btn_frame.pack(anchor="w", pady=5)
     load_btn = ttk.Button(btn_frame, text="Load Routes")
     load_btn.pack(side="left", padx=2)
 
-    outer_frame = ttk.Frame(tab)
-    outer_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+    outer = ttk.Frame(route_frame)
+    outer.pack(fill="both", expand=True)
 
-    canvas = tk.Canvas(outer_frame, background="white")
+    canvas = tk.Canvas(outer, background="white")
     canvas.pack(side="left", fill="both", expand=True)
-
-    vbar = ttk.Scrollbar(outer_frame, orient="vertical", command=canvas.yview)
-    vbar.pack(side="right", fill="y", padx=(5, 0))
-
-    hbar = ttk.Scrollbar(tab, orient="horizontal", command=canvas.xview)
-    hbar.pack(fill="x", padx=10, pady=(0, 10))
+    vbar = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+    vbar.pack(side="right", fill="y")
+    hbar = ttk.Scrollbar(route_frame, orient="horizontal", command=canvas.xview)
+    hbar.pack(fill="x")
 
     canvas.configure(yscrollcommand=vbar.set, xscrollcommand=hbar.set)
 
@@ -288,190 +341,49 @@ def create_routes_tab(notebook, port_var):
                         anchor="w", justify="left", wraplength=200
                     )
                     lbl.pack(anchor="w", pady=1)
-                    lbl.bind("<Button-1>",
-                             lambda e, p=path: webbrowser.open_new_tab(
-                                 f"http://127.0.0.1:{port_var.get()}{p}"))
+                    lbl.bind("<Button-1>", lambda e, p=path: webbrowser.open_new_tab(
+                        f"http://127.0.0.1:{port_var.get()}{p}"))
                 col += 1
-
         except Exception as e:
             tk.Label(inner, text=f"Error loading routes: {e}", fg="red").pack(pady=10)
 
     load_btn.config(command=load_routes)
 
-def render_password_tab(notebook):
-    tab = ttk.Frame(notebook)
-    notebook.add(tab, text="Admin Password")
-
-    ttk.Label(tab, text="Change Admin Password", font=("Arial", 12, "bold")).pack(pady=10)
-
-    path = os.path.join("data", "config.json")
-    try:
-        with open(path, "r") as f:
-            config = json.load(f)
-    except Exception as e:
-        tk.Label(tab, text=f"Failed to load config.json: {e}", fg="red").pack(pady=10)
-        return
-
-    current_var = tk.StringVar()
-    new_var     = tk.StringVar()
-    confirm_var = tk.StringVar()
-
-    def change_password():
-        current = current_var.get().strip()
-        new     = new_var.get().strip()
-        confirm = confirm_var.get().strip()
-
-        if current != config.get("admin_password"):
-            messagebox.showerror("Error", "Current password incorrect.")
-            return
-        if not new:
-            messagebox.showerror("Error", "New password cannot be empty.")
-            return
-        if new != confirm:
-            messagebox.showerror("Error", "New and confirm password do not match.")
-            return
-
-        config["admin_password"] = new
+    # --- Rebuild Section ---
+    def run_split_masterlist():
+        script = os.path.join(os.path.dirname(__file__), "scripts", "build_student_periods.py")
         try:
-            with open(path, "w") as f:
-                json.dump(config, f, indent=2)
-            messagebox.showinfo("Success", "Password changed successfully.")
-            current_var.set("")
-            new_var.set("")
-            confirm_var.set("")
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to save: {e}")
-
-    form = ttk.Frame(tab)
-    form.pack(pady=10)
-
-    for label, var in [
-        ("Current Password", current_var),
-        ("New Password", new_var),
-        ("Confirm New Password", confirm_var)
-    ]:
-        row = ttk.Frame(form)
-        row.pack(anchor="w", pady=5, padx=10)
-        ttk.Label(row, text=label, width=20).pack(side="left")
-        ttk.Entry(row, textvariable=var, show="*", width=30).pack(side="left")
-
-    ttk.Button(tab, text="Change Password", command=change_password).pack(pady=15)
-
-def render_config_editor_tab(notebook):
-    tab = ttk.Frame(notebook)
-    notebook.add(tab, text="Config Editor")
-
-    path = os.path.join("data", "config.json")
-
-    fields = [
-        ("School Name", "school_name"),
-        ("Theme Color (hex)", "theme_color"),
-        ("Passes Available", "passes_available"),
-        ("Max Pass Time (seconds)", "max_pass_time_seconds"),
-        ("Auto Reset Time (HH:MM)", "auto_reset_time"),
-        ("Session Timeout (min)", "session_timeout_minutes"),
-    ]
-
-    try:
-        with open(path, "r") as f:
-            config = json.load(f)
-    except Exception as e:
-        tk.Label(tab, text=f"Failed to load config.json: {e}", fg="red").pack(pady=10)
-        return
-
-    widgets = {}
-    for label_text, key in fields:
-        frame = ttk.Frame(tab)
-        frame.pack(anchor="w", padx=10, pady=4)
-        ttk.Label(frame, text=label_text, width=25).pack(side="left")
-        val = config.get(key, "")
-        var = tk.StringVar(value=str(val))
-        entry = ttk.Entry(frame, textvariable=var, width=40)
-        entry.pack(side="left")
-        widgets[key] = var
-
-    def save_config():
-        try:
-            for k, var in widgets.items():
-                val = var.get().strip()
-                if k in ["passes_available", "max_pass_time_seconds", "session_timeout_minutes"]:
-                    config[k] = int(val)
-                else:
-                    config[k] = val
-
-            with open(path, "w") as f:
-                json.dump(config, f, indent=2)
-            messagebox.showinfo("Saved", "Configuration updated.")
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-
-    ttk.Button(tab, text="Save Config", command=save_config).pack(pady=10)
-
-def render_rebuild_tab(notebook):
-    tab = ttk.Frame(notebook)
-    notebook.add(tab, text="Rebuild & Export")
-    ttk.Label(tab, text="Rebuild the database from Seed files.", font=("Arial", 10)).pack(pady=(20, 5))
+            subprocess.run([sys.executable, script], check=True)
+            messagebox.showinfo("Done", "Masterlist split into CSVs.")
+        except subprocess.CalledProcessError as e:
+            messagebox.showerror("Failed", f"Split failed: {str(e)}")
 
     def trigger_rebuild():
         if server_process:
             messagebox.showwarning("Server running", "Stop the server first.")
             return
-        with contextlib.suppress(ImportError):
-            wsgi_mod = import_module("wsgi")
-            if hasattr(wsgi_mod, "get_app"):
-                try:
-                    app = wsgi_mod.get_app()
-                    with app.app_context():
-                        from src.models import db
-                        db.session.close_all()
-                        db.get_engine().dispose()
-                except:
-                    pass
         script = os.path.join(os.path.dirname(__file__), "scripts", "rebuild_db.py")
         try:
             subprocess.run([sys.executable, script], check=True)
             messagebox.showinfo("Done", "Database rebuilt.")
         except subprocess.CalledProcessError as e:
             messagebox.showerror("Failed", str(e))
-    ttk.Label(tab, text="Pre-process Seed Files", font=("Arial", 10)).pack(pady=(20, 5))
-    ttk.Button(tab, text="Split Masterlist (Do before rebuild)", command=run_split_masterlist).pack(pady=(2, 20))
-    ttk.Button(tab, text="Rebuild Database", command=trigger_rebuild).pack(pady=10)
-    ttk.Label(tab, text="Export current DB to /data/logs/", font=("Arial", 10)).pack(pady=(30, 5))
 
     def export_from_db():
-        db_path = "data/hallpass.db"
-        log_dir = "data/logs"
-        os.makedirs(log_dir, exist_ok=True)
-        today = datetime.now().strftime("%Y%m%d")
-
         try:
+            db_path = "data/hallpass.db"
+            log_dir = "data/logs"
+            os.makedirs(log_dir, exist_ok=True)
+            today = datetime.now().strftime("%Y%m%d")
             conn = sqlite3.connect(db_path)
 
-            # Export Users (students + teachers)
-            df_users = pd.read_sql("SELECT * FROM users", conn)
-            df_users.to_csv(os.path.join(log_dir, f"{today}_users.csv"), index=False)
+            tables = ["users", "student_periods", "passes", "pass_events", "audit_log", "active_rooms"]
+            for table in tables:
+                df = pd.read_sql(f"SELECT * FROM {table}", conn)
+                df.to_csv(os.path.join(log_dir, f"{today}_{table}.csv"), index=False)
 
-            # Export Student Periods
-            df_periods = pd.read_sql("SELECT * FROM student_periods", conn)
-            df_periods.to_csv(os.path.join(log_dir, f"{today}_student_periods.csv"), index=False)
-
-            # Export Passes
             df_passes = pd.read_sql("SELECT * FROM passes", conn)
-            df_passes.to_csv(os.path.join(log_dir, f"{today}_passes.csv"), index=False)
-
-            # Export Pass Events
             df_events = pd.read_sql("SELECT * FROM pass_events", conn)
-            df_events.to_csv(os.path.join(log_dir, f"{today}_pass_events.csv"), index=False)
-
-            # Export Audit Log
-            df_audit = pd.read_sql("SELECT * FROM audit_log", conn)
-            df_audit.to_csv(os.path.join(log_dir, f"{today}_audit_log.csv"), index=False)
-
-            # Export Active Rooms
-            df_active = pd.read_sql("SELECT * FROM active_rooms", conn)
-            df_active.to_csv(os.path.join(log_dir, f"{today}_active_rooms.csv"), index=False)
-
-            # Optional JSON summary: each pass with associated events
             grouped = {}
             for _, p in df_passes.iterrows():
                 rec = p.to_dict()
@@ -482,30 +394,20 @@ def render_rebuild_tab(notebook):
                 json.dump(grouped, fh, indent=2)
 
             conn.close()
-            messagebox.showinfo("Exported", f"Files saved to /data/logs/ with prefix {today}_*")
-
+            messagebox.showinfo("Exported", f"✅ Exported tables + JSON to /data/logs/")
         except Exception as e:
             messagebox.showerror("Export failed", str(e))
 
-    ttk.Button(tab, text="Export DB → /data/logs/", command=export_from_db).pack(pady=10)
+    tools_frame = ttk.LabelFrame(tab, text="Database Tools")
+    tools_frame.pack(fill="x", padx=10, pady=10)
+    ttk.Label(tools_frame, text="Pre-process Seed Files").pack(pady=5)
+    ttk.Button(tools_frame, text="Split Masterlist", command=run_split_masterlist).pack(pady=2)
+    ttk.Button(tools_frame, text="Rebuild Database", command=trigger_rebuild).pack(pady=5)
+    ttk.Label(tools_frame, text="Export DB to /data/logs/").pack(pady=(10, 5))
+    ttk.Button(tools_frame, text="Export DB", command=export_from_db).pack(pady=2)
 
-def check_server_health(port_var):
-    def _check():
-        import urllib.request, time
-        global status_var, status_label
-        while True:
-            try:
-                with urllib.request.urlopen(f"http://127.0.0.1:{port_var.get()}/ping", timeout=2):
-                    if status_var:
-                        status_var.set("Server status: running")
-                        status_label.config(fg="green")
-            except:
-                if status_var:
-                    status_var.set("Server status: not responding")
-                    status_label.config(fg="red")
-            time.sleep(10)
-    threading.Thread(target=_check, daemon=True).start()
 
+# ─── Main Entry ─────────────────────────────────────────────────────────────
 def build_gui():
     global console_text
 
@@ -522,8 +424,6 @@ def build_gui():
     root.minsize(900, 600)
 
     notebook = ttk.Notebook(root)
-
-
     tab_server = ttk.Frame(notebook)
     notebook.add(tab_server, text="Server")
 
@@ -531,7 +431,12 @@ def build_gui():
     ttk.Label(tab_server, text="Port:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
     ttk.Entry(tab_server, textvariable=port_var, width=8).grid(row=0, column=1, padx=5, pady=5, sticky="w")
 
-    # ─── Schedule Dropdown ───
+    ttk.Label(tab_server, text="Day Type:").grid(row=0, column=2, padx=10, sticky="e")
+    schedule_var = tk.StringVar(value="regular")
+    schedule_menu = ttk.Combobox(tab_server, textvariable=schedule_var, state="readonly")
+    schedule_menu["values"] = ["regular", "half_day", "delayed"]
+    schedule_menu.grid(row=0, column=3, padx=5, sticky="w")
+
     def update_schedule_choice(event=None):
         selected = schedule_var.get()
         try:
@@ -544,11 +449,6 @@ def build_gui():
         except Exception as e:
             log(f"⚠️ Failed to update schedule: {e}")
 
-    ttk.Label(tab_server, text="Day Type:").grid(row=0, column=2, padx=10, sticky="e")
-    schedule_var = tk.StringVar(value="regular")
-    schedule_menu = ttk.Combobox(tab_server, textvariable=schedule_var, state="readonly")
-    schedule_menu["values"] = ["regular", "half_day", "delayed"]
-    schedule_menu.grid(row=0, column=3, padx=5, sticky="w")
     schedule_menu.bind("<<ComboboxSelected>>", update_schedule_choice)
 
     ttk.Button(tab_server, text="Launch via WSGI", command=lambda: launch_server("wsgi", port_var.get(), notebook)).grid(row=1, column=0, columnspan=2, pady=4)
@@ -558,15 +458,16 @@ def build_gui():
 
     local = tk.Label(tab_server, text="🌐 Local: http://127.0.0.1:5000", fg="blue", cursor="hand2")
     local.grid(row=4, column=0, columnspan=2, sticky="w", padx=10)
-    local.bind("<Button-1>", lambda e: webbrowser.open_new_tab(f"http://127.0.0.1:{port_var.get()}"))
+    local.bind("<Button-1>", lambda e: browser(f"http://127.0.0.1:{port_var.get()}"))
 
     lan_ip = get_local_ip()
     lan = tk.Label(tab_server, text=f"📡 LAN:   http://{lan_ip}:5000", fg="blue", cursor="hand2")
+    lan.grid(row=5, column=0, columnspan=2, sticky="w", padx=10)
+    lan.bind("<Button-1>", lambda e: browser(f"http://{lan_ip}:{port_var.get()}"))
+
     status_var = tk.StringVar(value="Server status: unknown")
     status_label = tk.Label(tab_server, textvariable=status_var, font=("Arial", 10))
     status_label.grid(row=6, column=2, sticky="w", padx=10)
-    lan.grid(row=5, column=0, columnspan=2, sticky="w", padx=10)
-    lan.bind("<Button-1>", lambda e: webbrowser.open_new_tab(f"http://{lan_ip}:{port_var.get()}"))
 
     console_frame = ttk.LabelFrame(tab_server, text="Server Console")
     console_frame.grid(row=6, column=0, columnspan=4, padx=10, pady=10, sticky="nsew")
@@ -585,21 +486,32 @@ def build_gui():
     tab_server.rowconfigure(6, weight=1)
     tab_server.columnconfigure(0, weight=1)
 
-    create_routes_tab(notebook, port_var)
-    render_rebuild_tab(notebook)
-
     notebook.pack(expand=True, fill="both")
-    check_server_health(port_var)
-    render_config_editor_tab(notebook)
-    render_password_tab(notebook)
+
+    render_maintenance_tab(notebook, port_var)
+    render_settings_tab(notebook)
+
+    def check_server_health():
+        import urllib.request
+        while True:
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port_var.get()}/ping", timeout=2):
+                    status_var.set("Server status: running")
+                    status_label.config(fg="green")
+            except:
+                status_var.set("Server status: not responding")
+                status_label.config(fg="red")
+            time.sleep(10)
+
+    threading.Thread(target=check_server_health, daemon=True).start()
+
     stream_audit_log()
 
     def on_close():
-        stop_server()  # cleanly kill Flask server
+        stop_server()
         root.destroy()
 
     root.protocol("WM_DELETE_WINDOW", on_close)
-
     root.mainloop()
 
 if __name__ == "__main__":

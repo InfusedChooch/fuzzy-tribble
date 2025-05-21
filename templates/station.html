@@ -64,7 +64,7 @@
         });
     }, 30000);
   </script>
-
+  <script>window.userRole = "{{ session.get('role') }}";</script>
   <script type="module" src="{{ url_for('static', filename='js/index.js') }}"></script>
   <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 

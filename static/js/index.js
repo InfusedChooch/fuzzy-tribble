@@ -154,5 +154,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
   setInterval(updateCustomClock, 1000);
   setInterval(updatePeriod, 30000);
-  setInterval(loadRoomDots, 5000);
+  setInterval(loadRoomDots, 12000);
 });

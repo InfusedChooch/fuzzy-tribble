@@ -82,7 +82,7 @@
 <script>
   window.userName = "{{ session.get('name') or 'User' }}";
 </script>
-
+  <script>window.userRole = "{{ session.get('role') }}";</script>
   <script src="{{ url_for('static', filename='js/index.js') }}"></script>
   <script> window.userName = "{{ session.get('name', 'User') }}"; </script>
   <script src="{{ url_for('static', filename='js/theme.js') }}"></script>

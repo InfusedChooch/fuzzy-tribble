@@ -18,12 +18,35 @@ body.dark {
   --text: #eee;
   --card-bg: #1f1f1f;
   --link: #9ecbff;
-  --link-hover: #73b4ff;
+  --link-hover: #73ffd0;
   --btn-bg: #3a71c1;
   --btn-hover: #2a5692;
   --border: #555;
   --error: #ff6b6b;
   --table-header: #2a2a2a;
+}
+
+body.dark nav {
+  background-color: #1e1e1e;
+}
+
+body.dark nav a {
+  color: var(--link);
+}
+
+body.dark nav a:hover {
+  color: var(--link-hover);
+}
+
+body.dark .custom-clock,
+body.dark .clock {
+  background-color: #222;
+  color: #ffdd57;
+  border-color: #ffdd57;
+}
+
+body.dark .pass-box {
+  border-color: #aaa;
 }
 
 /* ─── Base Layout ───────────────────────────────────────────── */

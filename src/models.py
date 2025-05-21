@@ -15,7 +15,7 @@ class ActiveRoom(db.Model):
     added = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
 
 # ---------------------------------------------------------------------
-# Students
+# Users
 # ---------------------------------------------------------------------
 class User(db.Model):
     __tablename__ = "users"
@@ -35,7 +35,49 @@ class User(db.Model):
         from werkzeug.security import check_password_hash
         return check_password_hash(self.password, raw_password)
 
+# ---------------------------------------------------------------------
+# Student / Teacher Schedules
+# ---------------------------------------------------------------------
+class TeacherSchedule(db.Model):
+    __tablename__ = "teacher_schedule"
 
+    teacher_id = db.Column(db.String, db.ForeignKey("users.id"), primary_key=True)
+
+    # Add one column per configured period key (underscore-safe)
+    period_0 = db.Column(db.String(10))
+    period_1 = db.Column(db.String(10))
+    period_2 = db.Column(db.String(10))
+    period_3 = db.Column(db.String(10))
+    period_4_5 = db.Column(db.String(10))
+    period_5_6 = db.Column(db.String(10))
+    period_6_7 = db.Column(db.String(10))
+    period_7_8 = db.Column(db.String(10))
+    period_9 = db.Column(db.String(10))
+    period_10 = db.Column(db.String(10))
+    period_11 = db.Column(db.String(10))
+    period_12 = db.Column(db.String(10))
+
+    teacher = db.relationship("User", backref="teacher_schedule", lazy=True)
+
+class StudentSchedule(db.Model):
+    __tablename__ = "student_schedule"
+
+    student_id = db.Column(db.String, db.ForeignKey("users.id"), primary_key=True)
+
+    period_0 = db.Column(db.String(10))
+    period_1 = db.Column(db.String(10))
+    period_2 = db.Column(db.String(10))
+    period_3 = db.Column(db.String(10))
+    period_4_5 = db.Column(db.String(10))
+    period_5_6 = db.Column(db.String(10))
+    period_6_7 = db.Column(db.String(10))
+    period_7_8 = db.Column(db.String(10))
+    period_9 = db.Column(db.String(10))
+    period_10 = db.Column(db.String(10))
+    period_11 = db.Column(db.String(10))
+    period_12 = db.Column(db.String(10))
+
+    student = db.relationship("User", backref="schedule", lazy=True)
 
 class StudentPeriod(db.Model):
     """

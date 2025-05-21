@@ -31,9 +31,7 @@
 <nav>
   <a href="{{ url_for('auth.logout') }}">Logout</a> |
   <a href="{{ url_for('report.admin_pass_history') }}">Pass History</a> |
-  <a href="{{ url_for('admin.admin_weekly_summary') }}">View Weekly Summary →</a> |
-  <button onclick="location.reload()">🔄 Refresh All</button>
-  <button onclick="openPasswordPopup()">🔒 Change Password</button> |
+  <a href="{{ url_for('admin.admin_weekly_summary') }}">View Weekly Summary →</a>
 </nav>
 
 <!--  Moved Open Stations + Room Manager to here -->
@@ -46,6 +44,7 @@
   <button onclick="openWindowRemembered('/admin_rooms_ui', 'roomMgr')" style="padding: 6px 10px; font-size: 0.9em;">
     ⚙️ Room Manager
   </button>
+  <button onclick="location.reload()" style="padding: 6px 10px; font-size: 0.9em;">🔄 Refresh All </button>
 </div>
 
 
@@ -155,8 +154,13 @@
 <script>
   window.userName = "{{ session.get('name', 'User') }}";
 </script>
+<script>window.userRole = "{{ session.get('role') }}";</script>
 <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
 <script type="module" src="{{ url_for('static', filename='js/index.js') }}"></script>
 <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+<script>
+  window.needsScheduleSetup = {{ needs_schedule_setup | tojson }};
+</script>
+
 </body>
 </html>

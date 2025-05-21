@@ -89,6 +89,20 @@ def get_room(student_id, period):
     rec = StudentPeriod.query.filter_by(student_id=student_id, period=period).first()
     return rec.room if rec else None
 
+
+def sync_student_schedule_to_periods():
+    from src.models import StudentSchedule, StudentPeriod
+
+    StudentPeriod.query.delete()
+
+    all_scheds = StudentSchedule.query.all()
+    for sched in all_scheds:
+        for key, val in vars(sched).items():
+            if key.startswith("period_") and val:
+                period = key.replace("period_", "").replace("_", "/")
+                db.session.add(StudentPeriod(student_id=sched.student_id, period=period, room=val))
+    db.session.commit()
+
 # ─── CSV export helper ─────────────────────────────────────────────────────
 from flask import make_response
 

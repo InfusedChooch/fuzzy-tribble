@@ -5,6 +5,8 @@ from datetime import timedelta
 import json
 from werkzeug.security import check_password_hash
 from sqlalchemy import func
+from src.models import TeacherSchedule
+from sqlalchemy.orm import class_mapper
 
 
 from src.utils import (
@@ -52,17 +54,17 @@ def login():
         # 🔐 Admin case
         if user_input.lower() == admin_username.lower():
             if password == config.get("admin_password"):
-                session.clear()  # ✅ Double safety
+                session.clear()
                 session['logged_in'] = True
                 session['role'] = 'admin'
-                session['name'] = 'Admin'  # ✅ Prevent "James G" carryover
+                session['name'] = 'Admin'
                 log_audit("admin", f"Admin {user_input} logged in successfully")
                 return redirect(url_for('admin.admin_view'))
             else:
                 log_audit("admin", f"Failed admin login by {user_input}")
                 return render_template('login.html', error="Incorrect admin password.")
 
-        # 🔐 User case (email or ID)
+        # 🔐 User login case (student or teacher)
         user = None
         if "@" in user_input:
             user = User.query.filter(func.lower(User.email) == user_input.lower()).first()
@@ -75,7 +77,7 @@ def login():
         if not check_password_hash(user.password, password):
             return render_template('login.html', error="Incorrect password.")
 
-        # ✅ Clean slate
+        # ✅ Valid login
         session.clear()
         session['name'] = user.name
         session['role'] = user.role
@@ -85,16 +87,32 @@ def login():
             return redirect(url_for('core.student_landing'))
 
         elif user.role == "teacher":
-            from src.models import StudentPeriod
-            assigned = StudentPeriod.query.filter_by(student_id=user.id).all()
+            from src.models import TeacherSchedule
+            from sqlalchemy.orm import class_mapper
+
             session['teacher_id'] = str(user.id)
-            session['teacher_rooms'] = list({r.room for r in assigned})
+
+            # Ensure schedule exists
+            schedule = TeacherSchedule.query.filter_by(teacher_id=user.id).first()
+            if not schedule:
+                schedule = TeacherSchedule(teacher_id=user.id)
+                db.session.add(schedule)
+                db.session.commit()
+
+            # Extract non-null rooms from schedule
+            period_cols = [c.key for c in class_mapper(TeacherSchedule).columns if c.key.startswith("period_")]
+            rooms = set()
+            for col in period_cols:
+                val = getattr(schedule, col)
+                if val:
+                    rooms.add(val.strip())
+
+            session['teacher_rooms'] = list(rooms)
             session['logged_in'] = True
             log_audit(user.id, "Teacher logged in successfully")
             return redirect(url_for('admin.admin_view'))
 
-        return render_template('login.html', error="Non-student login not yet implemented.")
-
+    # 👇 Always return the login page if GET or if POST failed to redirect
     return render_template('login.html')
 
 
@@ -135,7 +153,9 @@ def logout():
             deactivate_room(room)
         log_audit("admin", "Admin logout")
     else:
-        log_audit(user_id, f"{role.capitalize()} logout")
+        safe_role = role.capitalize() if role else "User"
+        log_audit(user_id, f"{safe_role} logout")
 
     session.clear()
     return redirect(url_for('auth.login'))
+

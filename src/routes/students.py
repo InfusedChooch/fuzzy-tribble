@@ -20,23 +20,38 @@ def manage_students():
     return render_template('students.html', students=students)
 
 # ------------------------------------------------------------------
+# ------------------------------------------------------------------
 @students_bp.route('/students/download')
 def download_students_csv():
     if not session.get('logged_in'):
         return redirect(url_for('auth.admin_login'))
 
+    from src.models import StudentSchedule
+
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['ID', 'Name', 'Period', 'Room'])
+
+    # Write header
+    period_fields = [
+        "period_0", "period_1", "period_2", "period_3", "period_4_5",
+        "period_5_6", "period_6_7", "period_7_8", "period_9",
+        "period_10", "period_11", "period_12"
+    ]
+    writer.writerow(['ID', 'Name'] + period_fields)
 
     students = User.query.filter_by(role="student").all()
     for student in students:
-        periods = StudentPeriod.query.filter_by(student_id=student.id).all()
-        for sp in periods:
-            writer.writerow([student.id, student.name, sp.period, sp.room])
+        sched = StudentSchedule.query.get(student.id)
+        if sched:
+            row = [student.id, student.name] + [
+                getattr(sched, field, "") or "" for field in period_fields
+            ]
+            writer.writerow(row)
 
     output.seek(0)
-    return Response(output, mimetype="text/csv", headers={"Content-Disposition": "attachment; filename=students.csv"})
+    return Response(output, mimetype="text/csv", headers={
+        "Content-Disposition": "attachment; filename=students_schedule.csv"
+    })
 
 # ------------------------------------------------------------------
 @students_bp.route('/students/upload', methods=['POST'])
@@ -49,7 +64,10 @@ def upload_students_csv():
         return "No file uploaded", 400
 
     try:
-        # Clear existing data
+        # Wipe old records
+        from src.models import StudentSchedule, StudentPeriod
+
+        StudentSchedule.query.delete()
         StudentPeriod.query.delete()
         User.query.filter_by(role="student").delete()
         db.session.commit()
@@ -57,33 +75,42 @@ def upload_students_csv():
         stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
         reader = csv.DictReader(stream)
 
-        user_cache = {}
         for row in reader:
             student_id = row['ID'].strip()
             name = row['Name'].strip()
-            period = str(row['Period']).strip()
-            room = str(row['Room']).strip()
 
-            if student_id not in user_cache:
-                email = f"{student_id}@school.org"
-                password = generate_password_hash(student_id)
-                student = User(
-                    id=student_id,
-                    name=name,
-                    email=email,
-                    role="student",
-                    password=password
-                )
-                db.session.add(student)
-                user_cache[student_id] = student
-            else:
-                student = user_cache[student_id]
+            email = f"{student_id}@school.org"
+            password = generate_password_hash(student_id)
+            student = User(
+                id=student_id,
+                name=name,
+                email=email,
+                role="student",
+                password=password
+            )
+            db.session.add(student)
 
-            sp = StudentPeriod(student_id=student_id, period=period, room=room)
-            db.session.add(sp)
+            # Create StudentSchedule (wide row)
+            sched = StudentSchedule(student_id=student_id)
+            for key in row:
+                if key.startswith("period_"):
+                    setattr(sched, key, row[key].strip())
+            db.session.add(sched)
 
         db.session.commit()
-        log_audit("admin", "Uploaded student roster via CSV")
+
+        # Sync to StudentPeriod (normalized row-per-period)
+        from src.models import StudentSchedule, StudentPeriod
+
+        all_scheds = StudentSchedule.query.all()
+        for sched in all_scheds:
+            for key, val in vars(sched).items():
+                if key.startswith("period_") and val:
+                    period = key.replace("period_", "").replace("_", "/")
+                    db.session.add(StudentPeriod(student_id=sched.student_id, period=period, room=val))
+        db.session.commit()
+
+        log_audit("admin", "Uploaded student roster and synced schedules")
         return redirect(url_for('students.manage_students'))
 
     except Exception as e:

@@ -1,51 +1,60 @@
 #!/usr/bin/env python3
 """
-Split Seed/masterlist.csv →  Seed/users.csv  +  Seed/student_periods.csv
+Split masterlist.csv → users.csv + student_schedule.csv + teacher_schedule.csv
 
-• Accepts headers in ANY case:  student_id / ID / id   and   Name / name
-• Adds a 'role' column (default 'student') and raw-ID password.
-• Teachers (role ≠ student) go only to users.csv but their periods are added to student_periods.csv.
-• If a teacher has only a room name as their schedule, it maps across all standard periods.
-
-Run:
-    python scripts/build_student_periods.py
+• Default looks in /Seed
+• Falls back to local directory if needed
 """
 
 import csv, json, sys
 from pathlib import Path
 
-ROOT       = Path(__file__).resolve().parents[1]
-SEED_DIR   = ROOT / "Seed"
-MASTERLIST = SEED_DIR / "masterlist.csv"
+ROOT        = Path(__file__).resolve().parents[1]
+SEED_DIR    = ROOT / "Seed"
+SCRIPT_DIR  = Path(__file__).resolve().parent
 
-USERS_CSV   = SEED_DIR / "users.csv"
-PERIODS_CSV = SEED_DIR / "student_periods.csv"
+DEFAULT_ML  = SEED_DIR / "masterlist.csv"
+FALLBACK_ML = SCRIPT_DIR / "masterlist.csv"
 
-PERIOD_LIST = ["0", "1", "2", "3", "4/5", "7/8", "9", "10", "11", "12"]
+USERS_CSV         = SEED_DIR / "users.csv"
+STUDENT_SCHED_CSV = SEED_DIR / "student_schedule.csv"
+TEACHER_SCHED_CSV = SEED_DIR / "teacher_schedule.csv"
 
-def main() -> None:
-    if not MASTERLIST.exists():
-        sys.exit(f"❌ masterlist.csv not found at {MASTERLIST}")
+PERIOD_LIST = ["0", "1", "2", "3", "4/5", "5/6", "6/7", "7/8", "9", "10", "11", "12"]
+
+def safe_field(p):
+    return f"period_{p.replace('/', '_')}"
+
+def main():
+    masterlist = DEFAULT_ML if DEFAULT_ML.exists() else FALLBACK_ML
+
+    if not masterlist.exists():
+        sys.exit("❌ masterlist.csv not found in Seed or local directory.")
+
+    print(f"📄 Using: {masterlist.relative_to(ROOT)}")
 
     with (
-        MASTERLIST.open(newline="", encoding="utf-8") as src,
+        masterlist.open(newline="", encoding="utf-8") as src,
         USERS_CSV.open("w", newline="", encoding="utf-8") as f_users,
-        PERIODS_CSV.open("w", newline="", encoding="utf-8") as f_periods,
+        STUDENT_SCHED_CSV.open("w", newline="", encoding="utf-8") as f_stu_sched,
+        TEACHER_SCHED_CSV.open("w", newline="", encoding="utf-8") as f_tea_sched,
     ):
         reader  = csv.DictReader(src)
         w_user  = csv.writer(f_users)
-        w_per   = csv.writer(f_periods)
+        w_stu   = csv.writer(f_stu_sched)
+        w_tea   = csv.writer(f_tea_sched)
 
-        # headers expected by rebuild_db.py
-        w_user.writerow(["id", "name", "email", "role", "password"])
-        w_per.writerow(["student_id", "period", "room"])
+        user_header   = ["id", "name", "email", "role", "password"]
+        sched_header  = ["student_id"] + [safe_field(p) for p in PERIOD_LIST]
+
+        w_user.writerow(user_header)
+        w_stu.writerow(sched_header)
+        w_tea.writerow(["teacher_id"] + [safe_field(p) for p in PERIOD_LIST])
 
         for raw_row in reader:
-            # ---------- normalize headers and row data ----------
             row = {
-    (k.strip().lower() if k else ""): (v or "").strip()
-                for k, v in raw_row.items()
-                if k  # skip if key is None
+                (k.strip().lower() if k else ""): (v or "").strip()
+                for k, v in raw_row.items() if k
             }
 
             sid   = row.get("student_id") or row.get("id")
@@ -58,27 +67,26 @@ def main() -> None:
                 print(f"⚠️  Skipping row with missing ID/Name → {raw_row}")
                 continue
 
-            # ---------- write to users.csv ----------
-            w_user.writerow([sid, name, email, role, sid])  # default password = raw ID
+            w_user.writerow([sid, name, email, role, sid])  # password = ID
 
-            # ---------- determine period mapping ----------
-            try:
-                if blob.strip().startswith("{"):
-                    sched = json.loads(blob)
-                elif role != "student" and blob.strip():  # teacher with room string
-                    sched = {period: blob.strip() for period in PERIOD_LIST}
-                else:
+            if role == "student":
+                try:
+                    sched = json.loads(blob) if blob.strip().startswith("{") else {}
+                except json.JSONDecodeError:
+                    print(f"⚠️  Bad schedule JSON for {sid}; skipping")
                     sched = {}
-            except json.JSONDecodeError:
-                print(f"⚠️  Bad schedule for {sid}; skipping periods")
-                sched = {}
 
-            for period, room in sched.items():
-                if period and room:
-                    w_per.writerow([sid, str(period), str(room)])
+                out = [sid]
+                for p in PERIOD_LIST:
+                    out.append(sched.get(p, ""))
+                w_stu.writerow(out)
 
-    print(f"✅ Wrote {USERS_CSV.relative_to(ROOT)}")
-    print(f"✅ Wrote {PERIODS_CSV.relative_to(ROOT)}")
+            else:
+                w_tea.writerow([sid] + [""] * len(PERIOD_LIST))
+
+    print(f"✅ Wrote: {USERS_CSV.relative_to(ROOT)}")
+    print(f"✅ Wrote: {STUDENT_SCHED_CSV.relative_to(ROOT)}")
+    print(f"✅ Wrote: {TEACHER_SCHED_CSV.relative_to(ROOT)}")
 
 if __name__ == "__main__":
     main()
