@@ -1,7 +1,7 @@
 # src/routes/core.py
 
 from flask import Blueprint, render_template, request, redirect, url_for, session, jsonify
-from datetime import datetime
+from datetime import datetime, date
 from sqlalchemy import select
 
 from src.models import db, User, Pass, StudentPeriod
@@ -10,7 +10,8 @@ from src.utils import (
     get_current_periods,
     get_room,
     get_active_rooms,
-    log_audit
+    log_audit,
+    is_station
 )
 # from src.services import pass_manager  # Optional for future refactor
 
@@ -129,42 +130,42 @@ def passroom_view(room):
 
 @core_bp.route('/student_slot_view')
 def student_slot_view():
-    from src.models import Pass
-    from src.utils import (
-        is_station, load_config, get_active_rooms,
-        get_current_periods, get_room
-    )
-    from flask import session, jsonify
 
     config = load_config()
-    default_slots = config.get("station_slots", 3)
+    station_slots = config.get("station_slots", 3)
+    class_slots = config.get("passes_available", 2)
+
     student_id = session.get("student_id")
     periods = get_current_periods()
     current_period = periods[0] if periods else "0"
     current_room = get_room(student_id, current_period)
     active_rooms = get_active_rooms()
+    today = date.today()
 
     data = []
     for room in sorted(active_rooms):
-        # Skip all non-station rooms except the student's current one
+        # Only include stations and the student's current classroom
         if not is_station(room, config) and room != current_room:
             continue
 
-        taken = Pass.query.filter_by(room_in=room, status="active").count()
-        free = max(default_slots - taken, 0)
+        slots = station_slots if is_station(room, config) else class_slots
+
+        taken = Pass.query.filter_by(room_in=room, status="active", date=today).count()
+        pending = Pass.query.filter_by(room_in=room, status="pending_start", date=today).count()
+        used = taken + pending
+        free = max(slots - used, 0)
 
         data.append({
             "room": room,
             "free": free,
             "taken": taken,
-            "pending": 0,
+            "pending": pending,
             "active": True,
             "type": "station" if is_station(room, config) else "classroom",
             "is_current": (room == current_room)
         })
 
     return jsonify(data)
-
 
 
 # ─────────────────────────────────────────────────────────────────────────────

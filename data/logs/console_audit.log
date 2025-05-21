@@ -740,3 +740,56 @@
 [AUDIT] admin - Activated room Nurse
 [AUDIT] admin - Activated room Office
 [AUDIT] 600 - Student logout
+[AUDIT] admin - Admin admin logged in successfully
+[AUDIT] admin - Deactivated room 101
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Deactivated room Bathroom
+[AUDIT] admin - Deactivated room Guidance
+[AUDIT] admin - Deactivated room Library
+[AUDIT] admin - Deactivated room Nurse
+[AUDIT] admin - Deactivated room Office
+[AUDIT] admin - Admin logout
+[AUDIT] 900 - Teacher logged in successfully
+[AUDIT] admin - Activated room 115
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Activated room 115
+[AUDIT] admin - Activated room Guidance
+[AUDIT] 600 - Approved pass 15
+[AUDIT] 600 - IN at Guidance
+[AUDIT] 600 - OUT at Guidance
+[AUDIT] admin - Deactivated room Guidance
+[AUDIT] 600 - IN at 115
+[AUDIT] 600 - Returned pass 15 at 115
+[AUDIT] 900 - Teacher logout
+[AUDIT] admin - Admin admin logged in successfully
+[AUDIT] admin - Activated room Bathroom
+[AUDIT] admin - Activated room Guidance
+[AUDIT] admin - Activated room 101
+[AUDIT] admin - Activated room Library
+[AUDIT] admin - Activated room Nurse
+[AUDIT] admin - Activated room Office
+[AUDIT] admin - Activated room Bathroom3
+[AUDIT] admin - Renamed room "Bathroom3" → "CLosed"
+[AUDIT] admin - Activated room Bathroom3
+[AUDIT] admin - Deactivated room Bathroom3
+[AUDIT] admin - Deactivated room CLosed
+[AUDIT] admin - Deactivated room 101
+[AUDIT] admin - Removed room Bathroom3
+[AUDIT] admin - Deactivated room Office
+[AUDIT] admin - Deactivated room Nurse
+[AUDIT] admin - Deactivated room Library
+[AUDIT] admin - Deactivated room Guidance
+[AUDIT] admin - Deactivated room Bathroom
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Activated room 115
+[AUDIT] admin - Deactivated room 115
+[AUDIT] 600 - Denied room access to 115
+[AUDIT] 600 - Denied room access to 115
+[AUDIT] 600 - Denied room access to 115
+[AUDIT] admin - Activated room 115
+[AUDIT] 600 - Student logout
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Activated room 115
+[AUDIT] 600 - Student logout
+[AUDIT] admin - Deactivated room 115
+[AUDIT] admin - Activated room 115
