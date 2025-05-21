@@ -1,3 +1,0 @@
-id,date,student_id,checkout_at,checkin_at,period,origin_room,room_in,is_override,note,status,total_pass_time
-1,2025-05-20,600,2025-05-20 12:11:56.572802,2025-05-20 12:14:05.010909,6/7,115,,0,,returned,128
-2,2025-05-20,600,2025-05-20 12:52:28.251402,2025-05-20 12:53:22.519167,9,115,115,0,,returned,54

@@ -30,7 +30,8 @@ def station_console():
     station = session['station_id']
     activate_room(station)
 
-    current_period = get_current_periods()
+    periods = get_current_periods()
+    current_period = periods[0] if periods else "0"
     message = ""
 
     if request.method == 'POST':
@@ -94,14 +95,12 @@ def station_console():
                 # 🟢 Self-checkout logic for classrooms
                 if not is_station(station):
                     max_passes = config.get("passes_available", 2)
-                    periods = get_current_periods()
                     active_count = Pass.query.filter(
                         Pass.date == datetime.now().date(),
                         Pass.period.in_(periods),
                         Pass.origin_room == station,
                         Pass.checkin_at == None
                     ).count()
-
 
                     if active_count >= max_passes:
                         message = f"Max passes reached for Room {station}."
@@ -122,7 +121,6 @@ def station_console():
                     message = "You don’t have an active pass to use this station."
 
     return render_template('station.html', station=station, passes=[], message=message)
-
 # ------------------------------------------------------------------
 @passlog_bp.route('/close_station', methods=['POST'])
 def close_station():
