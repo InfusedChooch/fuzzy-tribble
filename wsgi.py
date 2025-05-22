@@ -1,5 +1,5 @@
 # wsgi.py
-from src import create_app
+from src.database import create_app
 import sys, os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "vendor"))

@@ -1,227 +1,145 @@
-# 🏢 Hall Pass Tracker (v0.7.5)
+# README.md — Updated 2025-05-21
 
-A Flask-based digital hall pass system for managing student movement across rooms and stations.
-Built for educational environments with student-facing kiosks, admin tools, logging, schedule flexibility, and GUI control.
+## 🧾 Overview
 
-Now includes a robust room manager UI, interactive launcher, and dynamic station visualization.
+TJMS Hall Pass Tracker is a student check-in/out web application for managing hallway usage. Built using Flask, SQLite, and JS/HTML/CSS, it supports Admin, Teacher, and Student logins, station swiping, and visual dashboards.
 
----
+Key features include:
 
-## 🚀 Features (v0.7.5)
-
-### ✅ Student Features
-
-* Login using Student ID
-* Request pass from scheduled room
-* Return when finished
-* Sign in/out of hallway stations (Bathroom, Nurse, etc.)
-* Auto-end pass when returning to original room
-* Auto-end override pass if returning to assigned room with no logs
-* Configurable max passes per room (via config)
-* Visual status of room slots (free/pending/taken)
-* Real-time kiosk bubble updates
-
-### ✅ Admin Features
-
-* Secure login with configurable username/password
-* Create override passes manually
-* Monitor all pending/active passes in real-time
-* Approve/reject requests via dashboard
-* Manually end any pass
-* Add/edit notes to open passes
-* Room Manager UI with:
-
-  * Toggle room/station active state
-  * View current occupancy (dots with tooltips)
-  * Rename, reset, view stats, or copy popout link
-  * Delete room or "Close All" from UI
-* View 50 most recent returns with full timestamps
-* Weekly pass summaries per student
-* Export pass and audit logs to CSV
-* Upload/download student rosters (CSV)
-
-### 🔹 GUI Launcher (Updated)
-
-* Launch server via WSGI or `main.py`
-* Stream stdout/stderr to console
-* Route preview browser for all endpoints
-* Config editor tab (colors, pass limit, reset time)
-* Day schedule selector (`regular`, `half_day`, `delayed`)
-* Export current DB to CSVs + JSON logs
-* Rebuild/reset DB from seed files
-* Tail audit log (`console_audit.log`)
+* Admin-controlled room/station activation
+* Dark mode and mobile-friendly interface
+* Automatic pass validation and kiosk station logging
+* Teacher and student schedules
+* Live and historical reports
+* CSV import/export and full database rebuild tools
 
 ---
 
-## 📁 Project File Tree
+## 📁 File Tree
 
-```plaintext
-📁 /
-├── launcher.py            — GUI launcher (Tkinter)
-├── main.py / wsgi.py      — App entrypoints
-├── requirements.txt       — Python deps
-├── README.md / Worklog.md — Docs + TODOs
+```
+launcher.py
+LICENSE
+main.py
+README.md
+Worklog.md
+wsgi.py
 
 📁 data/
-├── config.json            — App config (theme, slots, schedule)
-├── hallpass.db            — SQLite database
-├── station_heartbeat.json — Last station swipes
-└── logs/                  — Exports + audit trail
+├── config.json
+├── hallpass.db
+├── logs/
+│   ├── 20250521_active_rooms.csv
+│   ├── 20250521_audit_log.csv
+│   ├── 20250521_passes.csv
+│   ├── 20250521_passlog.json
+│   ├── 20250521_pass_events.csv
+│   ├── 20250521_student_periods.csv
+│   ├── 20250521_users.csv
+│   └── console_audit.log
 
 📁 scripts/
-├── masterlist.csv         — Initial student-period room mappings
-├── build_student_periods.py — Splits masterlist into rosters
-└── rebuild_db.py          — DB from seed files
+├── build_student_periods.py
+├── masterlist.csv
+└── rebuild_db.py
 
 📁 Seed/
-├── audit_log.csv / passes.csv / pass_events.csv
-├── students.csv / student_periods.csv
-└── masterlist.csv         — Source student schedule
+├── student_schedule.csv
+├── teacher_schedule.csv
+└── users.csv
 
 📁 src/
-├── __init__.py / database.py / models.py
-├── utils.py               — config, audit, CSV response
-├── services/
-│   └── pass_manager.py    — Pass logic engine
-└── routes/
-    ├── admin.py           — Dashboard, pass admin, room manager
-    ├── auth.py            — Login/logout (student/admin)
-    ├── core.py            — Student-facing pass flow
-    ├── passlog.py         — Kiosk logic + station interactions
-    ├── report.py          — Weekly reports + CSVs
-    └── students.py        — Roster upload/download/add
+├── database.py
+├── models.py
+├── utils.py
+├── __init__.py
+├── routes/
+│   ├── admin.py
+│   ├── auth.py
+│   ├── core.py
+│   ├── passlog.py
+│   ├── report.py
+│   └── students.py
+└── services/
+    └── pass_manager.py
 
 📁 static/
-├── student_upload_template.csv
 ├── css/
-│   └── style.css          — Global theming
+│   └── style.css
+├── csv/
+│   ├── active_rooms_template.csv
+│   ├── audit_log_template.csv
+│   ├── passes_template.csv
+│   ├── pass_events_template.csv
+│   ├── student_periods_template.csv
+│   ├── student_schedule_template.csv
+│   ├── teacher_schedule_template.csv
+│   └── users_template.csv
 ├── images/
 │   ├── icon.png
 │   └── school_logo.png
 └── js/
-    ├── admin.js           — Pass tables, timers, actions
-    ├── index.js           — Student bubbles + live clock
-    └── rooms.js           — Room Manager interface
+    ├── admin.js
+    ├── index.js
+    ├── rooms.js
+    └── theme.js
 
 📁 templates/
-├── *.html (admin, index, login, station, summary, etc.)
+├── admin.html
+├── admin_pass_history.html
+├── admin_report.html
+├── admin_rooms.html
+├── admin_weekly_summary.html
+├── landing.html
+├── login.html
+├── passreq.html
+├── station.html
+└── students.html
 ```
 
 ---
 
-## 🌐 App Logic Map
+## 🔁 Updated Features as of 2025-05-21
 
-```plaintext
-🖥️ launcher.py
- ├── Launches main.py / wsgi.py
- ├── Edits config.json
- ├── Displays audit logs, routes, rebuild tools
-
-🔗 main.py / wsgi.py → src/__init__.py
- └── Registers all Flask routes
-
-📂 src/routes/
- ├── auth.py       — Handles login/session
- ├── core.py       — Student check-in/request flow
- ├── passlog.py    — Station IN/OUT logic
- ├── admin.py      — Pass dashboard, room controls
- ├── report.py     — Summary exports + weekly data
- └── students.py   — CSV upload/download/add
-
-🧬 pass_manager.py
- └── create, approve, return, record event — core pass lifecycle
-
-🛠️ utils.py
- ├── get_current_period, get_room
- ├── load_config, log_audit
- └── csv_response for export endpoints
-
-📄 templates/
- └── Jinja2 views tied to route rendering
-
-📁 static/js/
- ├── admin.js — live timers, pass actions, collapse
- ├── index.js — student view, clock, period
- └── rooms.js — Room Manager (rename, reset, stats, delete)
-
-🫒 Worklog.md — Daily dev notes and tasks
-```
+* ✅ **Dark Mode** fully integrated with toggle button (moon emoji)
+* ✅ **Student landing page** (`landing.html`) added with personalized greeting, pass dots, and clock
+* ✅ **Student and Teacher password change** supported via pop-up (not page redirect)
+* ✅ **Export-to-CSV** added for all core tables via GUI launcher
+* ✅ **Teacher schedule enforcement**: limited classroom control to teacher schedule
+* ✅ **Room manager updated**: no hard deletes on toggle; "Close All" button added
+* ✅ **Audit log tails to GUI**
+* ✅ **JS timers** to track active pass durations
+* ✅ **Admin launcher GUI** now merges rebuild/export/settings/tools in a tabbed layout
 
 ---
 
-## 🤪 Testing Checklist
+# Worklog.md — 2025-05-21
 
-### Student Flow
+## ✅ Things Working
 
-* ✅ Login with ID → get routed to assigned room
-* ✅ Request pass → see pending status
-* ✅ Admin approves → see active
-* ✅ Swipe into station → status log updates
-* ✅ Return to origin → auto-close + audit
+* Room toggling and visualization (color dots)
+* Pop-up for password change (students + teachers)
+* CSV export from launcher working (to `data/logs`)
+* GUI tail for audit log confirmed working
+* Dark mode toggle with moon button
+* All pass lifecycles tested: start, swipe, return
+* Launcher GUI has working config editor + route preview
 
-### Admin Flow
+## 🔍 Needs Review
 
-* ✅ Login → dashboard loads open + returned passes
-* ✅ Approve/reject buttons work
-* ✅ Room Manager shows status dots + actions
-* ✅ Override passes work (manual checkout)
-* ✅ CSVs download correctly
-* ✅ Room Manager triple-dot menu works (rename, reset, delete, copy link)
+* Ensure all timestamps are stored UTC or converted cleanly
+* Confirm station slot config values are being pulled properly from `config.json`
+* Double-check that dark mode overrides text contrast in all templates (e.g., `landing.html` vs. `admin.html`)
 
----
+## 🛠️ Broken or Needs Fixing
 
-## 🔄 Recent Improvements (v0.7.5)
+* None observed today
 
-* ✅ Room bubbles now show live **occupied**, **pending**, and **free** states
-* ✅ Triple-dot menu for room manager actions (rename, stats, reset, delete, link)
-* ✅ `Close All Rooms` button in Room Manager
-* ✅ Station IN resets room-in bubble to green when leaving
-* ✅ Launcher export saves `students`, `passes`, `audit`, and `events` to `/data/logs/`
-* ✅ Audit log stream visible in GUI console
-* ✅ Kiosk window size/position is remembered per room
-* ✅ Refactored `/admin_rooms` logic with centralized config handling
-* ✅ `passroom_view` now strictly enforces period/room match
+## 🔜 Next Steps
 
----
-
-## 🛠 Setup Instructions
-
-```bash
-# 1. Create virtual environment
-python -m venv venv
-source venv/bin/activate       # or venv\Scripts\activate on Windows
-
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Run the GUI launcher
-python launcher.py
-```
-
-Alternatively:
-
-```bash
-# Run manually:
-python main.py
-# or
-waitress-serve --port=5000 wsgi:app
-```
-
----
-
-## 😂 Pass Status Lifecycle
-
-```plaintext
-→ Login (student ID)
-→ Request pass → pending_start
-→ Admin approves → active
-→ Swipe into station
-→ Return to origin → pending_return
-→ Admin approves → returned
-```
-
----
-
-## 💼 License
-
-MIT — Free to use, adapt, and deploy for educational institutions.
+* Add support for comments or notes per room (e.g., "Bathroom closed")
+* Add student photo/ID card optional field (or scan QR)
+* Enable per-student pass limits (daily/weekly)
+* Improve teacher override interface with dropdowns
+* Investigate SQLite concurrency limits for high volume swipes
+* Auto-clear stale open passes via cron or periodic audit

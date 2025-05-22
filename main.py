@@ -1,4 +1,4 @@
-from src import create_app
+from src.database import create_app
 from threading import Thread
 from datetime import datetime, timezone
 import json, os, time, sys
