@@ -1,0 +1,98 @@
+type,name,tbl_name,rootpage,sql
+table,active_rooms,active_rooms,2,"CREATE TABLE active_rooms (
+	room VARCHAR(20) NOT NULL, 
+	added DATETIME, 
+	PRIMARY KEY (room)
+)"
+index,sqlite_autoindex_active_rooms_1,active_rooms,3,NULL
+table,users,users,4,"CREATE TABLE users (
+	id VARCHAR NOT NULL, 
+	name VARCHAR NOT NULL, 
+	email VARCHAR NOT NULL, 
+	role VARCHAR NOT NULL, 
+	password VARCHAR NOT NULL, 
+	PRIMARY KEY (id), 
+	UNIQUE (email)
+)"
+index,sqlite_autoindex_users_1,users,5,NULL
+index,sqlite_autoindex_users_2,users,6,NULL
+table,teacher_schedule,teacher_schedule,7,"CREATE TABLE teacher_schedule (
+	teacher_id VARCHAR NOT NULL, 
+	period_0 VARCHAR(10), 
+	period_1 VARCHAR(10), 
+	period_2 VARCHAR(10), 
+	period_3 VARCHAR(10), 
+	period_4_5 VARCHAR(10), 
+	period_5_6 VARCHAR(10), 
+	period_6_7 VARCHAR(10), 
+	period_7_8 VARCHAR(10), 
+	period_9 VARCHAR(10), 
+	period_10 VARCHAR(10), 
+	period_11 VARCHAR(10), 
+	period_12 VARCHAR(10), 
+	PRIMARY KEY (teacher_id), 
+	FOREIGN KEY(teacher_id) REFERENCES users (id)
+)"
+index,sqlite_autoindex_teacher_schedule_1,teacher_schedule,8,NULL
+table,student_schedule,student_schedule,9,"CREATE TABLE student_schedule (
+	student_id VARCHAR NOT NULL, 
+	period_0 VARCHAR(10), 
+	period_1 VARCHAR(10), 
+	period_2 VARCHAR(10), 
+	period_3 VARCHAR(10), 
+	period_4_5 VARCHAR(10), 
+	period_5_6 VARCHAR(10), 
+	period_6_7 VARCHAR(10), 
+	period_7_8 VARCHAR(10), 
+	period_9 VARCHAR(10), 
+	period_10 VARCHAR(10), 
+	period_11 VARCHAR(10), 
+	period_12 VARCHAR(10), 
+	PRIMARY KEY (student_id), 
+	FOREIGN KEY(student_id) REFERENCES users (id)
+)"
+index,sqlite_autoindex_student_schedule_1,student_schedule,10,NULL
+table,student_periods,student_periods,11,"CREATE TABLE student_periods (
+	student_id VARCHAR NOT NULL, 
+	period VARCHAR(10) NOT NULL, 
+	room VARCHAR(10) NOT NULL, 
+	PRIMARY KEY (student_id, period), 
+	FOREIGN KEY(student_id) REFERENCES users (id)
+)"
+index,sqlite_autoindex_student_periods_1,student_periods,12,NULL
+table,passes,passes,13,"CREATE TABLE passes (
+	id INTEGER NOT NULL, 
+	date DATE, 
+	student_id VARCHAR NOT NULL, 
+	checkout_at DATETIME NOT NULL, 
+	checkin_at DATETIME, 
+	period VARCHAR(10), 
+	origin_room VARCHAR(10) NOT NULL, 
+	room_in VARCHAR(10), 
+	is_override BOOLEAN, 
+	note TEXT, 
+	status VARCHAR NOT NULL, 
+	total_pass_time INTEGER, 
+	PRIMARY KEY (id), 
+	CHECK (status IN ('pending_start','active','pending_return','returned')), 
+	CONSTRAINT uq_student_one_open_pass UNIQUE (student_id, checkin_at), 
+	FOREIGN KEY(student_id) REFERENCES users (id)
+)"
+index,sqlite_autoindex_passes_1,passes,14,NULL
+table,audit_log,audit_log,15,"CREATE TABLE audit_log (
+	id INTEGER NOT NULL, 
+	student_id VARCHAR, 
+	time DATETIME, 
+	reason VARCHAR(255) NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(student_id) REFERENCES users (id)
+)"
+table,pass_events,pass_events,16,"CREATE TABLE pass_events (
+	id INTEGER NOT NULL, 
+	pass_id INTEGER NOT NULL, 
+	station VARCHAR(50) NOT NULL, 
+	event VARCHAR(20) NOT NULL, 
+	timestamp DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(pass_id) REFERENCES passes (id) ON DELETE CASCADE
+)"

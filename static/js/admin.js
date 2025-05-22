@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(loadPasses, 5000);
   setInterval(loadPendingPasses, 5000);
 
-  if (window.needsScheduleSetup) openSchedulePopup();
+  if (window.needsScheduleSetup) preloadAndOpenSchedule();
 });
 
 /* ----------------------------------------------------------
@@ -261,7 +261,23 @@ function submitPasswordChange() {
     });
 }
 
-  function openSchedulePopup(existing = {}) {
+function preloadAndOpenSchedule() {
+  fetch('/admin/teacher_schedule')
+    .then(res => res.json())
+    .then(data => {
+      // Normalize nulls and keys
+      const cleaned = {};
+      for (const [k, v] of Object.entries(data)) {
+        cleaned[k] = v || '';
+      }
+      openSchedulePopup(cleaned);
+    })
+    .catch(() => openSchedulePopup({}));
+}
+
+console.log("🧪 openSchedulePopup received:", existing);
+
+function openSchedulePopup(existing = {}) {
   const popup = document.createElement('div');
   popup.style.position = 'fixed';
   popup.style.top = '10%';
@@ -274,26 +290,37 @@ function submitPasswordChange() {
   popup.style.boxShadow = '0 0 10px rgba(0,0,0,0.3)';
   popup.innerHTML = `<h3>Set Your Schedule</h3>`;
 
-  const periods = [
-    "period_0", "period_1", "period_2", "period_3", "period_4_5",
-    "period_5_6", "period_6_7", "period_7_8", "period_9",
-    "period_10", "period_11", "period_12"
-  ];
+  const periodMap = {
+    period_0: "Homeroom",
+    period_1: "Period 1",
+    period_2: "Period 2",
+    period_3: "Period 3",
+    period_4_5: "Period 4/5",
+    period_5_6: "Period 5/6",
+    period_6_7: "Period 6/7",
+    period_7_8: "Period 7/8",
+    period_9: "Period 9",
+    period_10: "Period 10",
+    period_11: "Period 11",
+    period_12: "Period 12"
+  };
 
   const form = document.createElement('form');
   form.style.maxHeight = '400px';
   form.style.overflowY = 'auto';
 
-  periods.forEach(period => {
+  Object.entries(periodMap).forEach(([key, labelText]) => {
     const label = document.createElement('label');
-    label.textContent = `${period}: `;
+    label.textContent = `${labelText}: `;
     label.style.display = 'block';
+
     const input = document.createElement('input');
     input.type = 'text';
-    input.name = period;
-    input.value = existing[period] || '';
+    input.name = key;
+    input.value = existing[key] || '';
     input.style.marginBottom = '8px';
     input.style.width = '100%';
+
     form.appendChild(label);
     form.appendChild(input);
   });
@@ -330,18 +357,17 @@ function submitPasswordChange() {
     .then(d => {
       alert(d.message);
       popup.remove();
-      location.reload(); // refresh visibility of rooms
+      location.reload();
     });
   });
 }
-
 
 function openSettingsPopup() {
   const popup = document.createElement('div');
   popup.style.cssText = 'position:fixed;top:20%;left:50%;transform:translateX(-50%);background:#fff;border:2px solid #000;padding:20px;z-index:9999;box-shadow:0 0 10px rgba(0,0,0,0.3)';
   popup.innerHTML = `
     <h3>⚙️ Settings</h3>
-    <button onclick="openSchedulePopup()">🗂 Edit Schedule</button><br><br>
+    <button onclick="preloadAndOpenSchedule()">🗂 Edit Schedule</button><br><br>
     <button onclick="openPasswordPopup()">🔑 Change Password</button><br><br>
     <button onclick="this.parentElement.remove()">❌ Close</button>
   `;

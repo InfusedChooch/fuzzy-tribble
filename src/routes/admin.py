@@ -569,3 +569,20 @@ def setup_schedule():
     log_audit(teacher_id, "Updated their schedule via popup")
     return jsonify({"success": True, "message": "Schedule updated."})
 
+@admin_bp.route('/admin/teacher_schedule')
+def get_teacher_schedule():
+    if session.get("role") != "teacher":
+        return jsonify({"error": "unauthorized"}), 403
+
+    from src.models import TeacherSchedule
+    from sqlalchemy.inspection import inspect
+
+    sched = TeacherSchedule.query.filter_by(teacher_id=session["teacher_id"]).first()
+    if not sched:
+        return jsonify({})
+
+    return jsonify({
+        attr.key: getattr(sched, attr.key) or ""
+        for attr in inspect(sched).mapper.column_attrs
+        if attr.key.startswith("period_")
+    })
