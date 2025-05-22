@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}My Pass History{% endblock %}
+{% block content %}
+<h2>📘 My Completed Passes</h2>
+<a href="{{ url_for('core.student_landing') }}">← Back to Dashboard</a>
+
+<table class="passes-table">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Period</th>
+      <th>Room Out</th>
+      <th>Station</th>
+      <th>Hallway Time</th>
+      <th>Station Time</th>
+      <th>Total Time Out</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in passes %}
+    <tr>
+      <td>{{ p.date }}</td>
+      <td>{{ p.period }}</td>
+      <td>{{ p.room_out }}</td>
+      <td>{{ p.station }}</td>
+      <td>{{ p.hallway }}</td>
+      <td>{{ p.station_time }}</td>
+      <td>{{ p.total }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

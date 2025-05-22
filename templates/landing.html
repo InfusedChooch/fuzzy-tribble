@@ -5,19 +5,24 @@
   <title>Student Dashboard</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <script src="{{ url_for('static', filename='js/index.js') }}" defer></script>
-  <script>window.userRole = "{{ session.get('role') }}";</script>
+  <script>
+    window.userRole = "{{ session.get('role') }}";
+    window.userName = "{{ student_name }}";  <!-- ✅ Fixed line -->
+  </script>
 </head>
 <body>
-  <nav style="background: #e4e4e4; padding: 10px 0; display: flex; justify-content: center; gap: 20px; font-size: 1.1em;">
+
+  <nav class="main-nav">
     {% if student_room %}
       <a href="{{ url_for('core.passroom_view', room=student_room) }}">📍 Passroom {{ student_room }}</a>
     {% endif %}
-    <a href="#">📋 View My Passes</a>
+   <a href="{{ url_for('core.my_passes') }}">📋 View My Passes</a>
     <a href="#" onclick="openPasswordPopup()">🔒 Change Password</a>
     <a href="{{ url_for('auth.logout') }}">📕 Logout</a>
   </nav>
 
-  <h1 id="welcome-msg">Welcome, {{ student_name }}</h1>
+  <h1 id="welcome-msg">Welcome</h1> <!-- JS will override this with full name -->
+
   <h3 id="period">Current Period: {{ current_period }}</h3>
 
   <div id="custom-clock" class="clock"></div>
@@ -29,10 +34,6 @@
   <h2 style="margin-top: 2em;">Room Status Overview</h2>
   <div id="room-dot-container" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin-top: 1em;"></div>
 
-<script>
-  window.userRole = "{{ session.get('role', '') }}";
-</script>
-<script src="{{ url_for('static', filename='js/theme.js') }}"></script>
-
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 </body>
 </html>

@@ -1,4 +1,5 @@
 # src/routes/students.py
+# Admin routes to view, upload, download, and add student schedules
 
 from flask import Blueprint, render_template, request, redirect, url_for, session, Response
 from src.models import db, User, StudentPeriod
@@ -10,7 +11,10 @@ from werkzeug.security import generate_password_hash
 students_bp = Blueprint('students', __name__)
 config = load_config()
 
-# ------------------------------------------------------------------
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Route: Manage Students Page
+# ─────────────────────────────────────────────────────────────────────────────
 @students_bp.route('/students')
 def manage_students():
     if not session.get('logged_in'):
@@ -19,8 +23,10 @@ def manage_students():
     students = User.query.filter_by(role="student").all()
     return render_template('students.html', students=students)
 
-# ------------------------------------------------------------------
-# ------------------------------------------------------------------
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Route: Download Student Schedule CSV
+# ─────────────────────────────────────────────────────────────────────────────
 @students_bp.route('/students/download')
 def download_students_csv():
     if not session.get('logged_in'):
@@ -31,7 +37,6 @@ def download_students_csv():
     output = io.StringIO()
     writer = csv.writer(output)
 
-    # Write header
     period_fields = [
         "period_0", "period_1", "period_2", "period_3", "period_4_5",
         "period_5_6", "period_6_7", "period_7_8", "period_9",
@@ -53,7 +58,10 @@ def download_students_csv():
         "Content-Disposition": "attachment; filename=students_schedule.csv"
     })
 
-# ------------------------------------------------------------------
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Route: Upload Student Schedule CSV
+# ─────────────────────────────────────────────────────────────────────────────
 @students_bp.route('/students/upload', methods=['POST'])
 def upload_students_csv():
     if not session.get('logged_in') or session.get('role') != "admin":
@@ -64,7 +72,6 @@ def upload_students_csv():
         return "No file uploaded", 400
 
     try:
-        # Wipe old records
         from src.models import StudentSchedule, StudentPeriod
 
         StudentSchedule.query.delete()
@@ -78,9 +85,9 @@ def upload_students_csv():
         for row in reader:
             student_id = row['ID'].strip()
             name = row['Name'].strip()
-
             email = f"{student_id}@school.org"
             password = generate_password_hash(student_id)
+
             student = User(
                 id=student_id,
                 name=name,
@@ -90,7 +97,6 @@ def upload_students_csv():
             )
             db.session.add(student)
 
-            # Create StudentSchedule (wide row)
             sched = StudentSchedule(student_id=student_id)
             for key in row:
                 if key.startswith("period_"):
@@ -99,9 +105,7 @@ def upload_students_csv():
 
         db.session.commit()
 
-        # Sync to StudentPeriod (normalized row-per-period)
-        from src.models import StudentSchedule, StudentPeriod
-
+        # Sync to StudentPeriod
         all_scheds = StudentSchedule.query.all()
         for sched in all_scheds:
             for key, val in vars(sched).items():
@@ -116,7 +120,10 @@ def upload_students_csv():
     except Exception as e:
         return f"Upload failed: {str(e)}", 500
 
-# ------------------------------------------------------------------
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Route: Manually Add a Student Period
+# ─────────────────────────────────────────────────────────────────────────────
 @students_bp.route('/students/add', methods=['POST'])
 def add_student():
     if not session.get('logged_in'):

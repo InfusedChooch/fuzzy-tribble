@@ -1,4 +1,5 @@
 # src/routes/core.py
+# Student pass request flow, slot views, and debugging endpoints
 
 from flask import Blueprint, render_template, request, redirect, url_for, session, jsonify
 from datetime import datetime, date
@@ -13,7 +14,6 @@ from src.utils import (
     log_audit,
     is_station
 )
-# from src.services import pass_manager  # Optional for future refactor
 
 core_bp = Blueprint('core', __name__)
 ping_bp = Blueprint('ping', __name__)
@@ -25,6 +25,9 @@ STATUS_RETURNED       = "returned"
 
 config = load_config()
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Route: Student Landing Page
 # ─────────────────────────────────────────────────────────────────────────────
 @core_bp.route('/student')
 def student_landing():
@@ -37,7 +40,6 @@ def student_landing():
     current_period = periods[0] if periods else "0"
     room = get_room(student_id, current_period)
 
-
     return render_template(
         'landing.html',
         student_name=student_name,
@@ -45,6 +47,46 @@ def student_landing():
         current_period=current_period
     )
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Route: Student Pass History View
+# ─────────────────────────────────────────────────────────────────────────────
+@core_bp.route('/my_passes')
+def my_passes():
+    if 'student_id' not in session:
+        return redirect(url_for('auth.login'))
+
+    student_id = session['student_id']
+
+    passes = Pass.query.filter_by(
+        student_id=student_id,
+        status="returned"
+    ).order_by(Pass.date.desc(), Pass.checkout_at.desc()).limit(50).all()
+
+    rows = []
+    for p in passes:
+        logs = sorted(p.events, key=lambda l: l.timestamp)
+        station_in = next((l for l in logs if l.event == "in"), None)
+        station_out = next((l for l in logs if l.event == "out"), None)
+
+        total_time = (p.checkin_at - p.checkout_at).total_seconds() if p.checkin_at and p.checkout_at else 0
+        station_time = (station_out.timestamp - station_in.timestamp).total_seconds() if station_in and station_out else 0
+        hallway_time = total_time - station_time if station_time else total_time
+
+        rows.append({
+            "date": p.date.strftime('%Y-%m-%d'),
+            "period": p.period or "-",
+            "room_out": p.room_out or "-",
+            "station": f"{station_in.station} → {station_out.station}" if station_in and station_out else "-",
+            "hallway": f"{int(hallway_time//60)}m {int(hallway_time%60)}s" if hallway_time else "-",
+            "station_time": f"{int(station_time//60)}m {int(station_time%60)}s" if station_time else "-",
+            "total": f"{int(total_time//60)}m {int(total_time%60)}s" if total_time else "-"
+        })
+
+    return render_template('my_passes.html', passes=rows)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Route: Passroom Entry Point (student → room)
 # ─────────────────────────────────────────────────────────────────────────────
 @core_bp.route('/passroom/<room>', methods=['GET', 'POST'])
 def passroom_view(room):
@@ -128,10 +170,12 @@ def passroom_view(room):
         session=session
     )
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Route: JSON View of Active Slots (used on student dashboard)
+# ─────────────────────────────────────────────────────────────────────────────
 @core_bp.route('/student_slot_view')
 def student_slot_view():
-
-    config = load_config()
     station_slots = config.get("station_slots", 3)
     class_slots = config.get("passes_available", 2)
 
@@ -144,12 +188,10 @@ def student_slot_view():
 
     data = []
     for room in sorted(active_rooms):
-        # Only include stations and the student's current classroom
         if not is_station(room, config) and room != current_room:
             continue
 
         slots = station_slots if is_station(room, config) else class_slots
-
         taken = Pass.query.filter_by(room_in=room, status="active", date=today).count()
         pending = Pass.query.filter_by(room_in=room, status="pending_start", date=today).count()
         used = taken + pending
@@ -169,6 +211,8 @@ def student_slot_view():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Debug Endpoints
+# ─────────────────────────────────────────────────────────────────────────────
 @core_bp.route('/debug_period')
 def debug_period():
     now = datetime.now().time()
@@ -186,11 +230,8 @@ def debug_period():
     return jsonify(matches)
 
 @core_bp.route('/debug_rooms')
-def debug_rooms():
-    return jsonify(sorted(list(get_active_rooms())))
-
 @core_bp.route('/debug/active_rooms')
-def debug_active_rooms():
+def debug_rooms():
     return jsonify(sorted(list(get_active_rooms())))
 
 @core_bp.route('/debug_students')
@@ -207,12 +248,13 @@ def debug_audit():
 def debug_session():
     if not session:
         return "<p>No session data found.</p>"
-
     return "<h2>Session Data</h2><ul>" + "".join(
         f"<li><strong>{k}</strong>: {v}</li>" for k, v in session.items()
     ) + "</ul>"
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Health Check Endpoint
 # ─────────────────────────────────────────────────────────────────────────────
 @ping_bp.route('/ping')
 def ping():

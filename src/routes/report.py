@@ -1,4 +1,5 @@
 # src/routes/report.py
+# Admin-side reports: weekly summary, CSV exports, and pass history view
 
 from flask import Blueprint, render_template, session, redirect, url_for, jsonify, Response, request, make_response
 from datetime import datetime
@@ -14,7 +15,10 @@ config = load_config()
 REPORT_DAYS = config.get("report_days", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
 THRESHOLDS = config.get("report_time_thresholds", {"over_5": 300, "over_10": 600})
 
-# ------------------------------------------------------------------
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Route: Weekly Summary View (HTML)
+# ─────────────────────────────────────────────────────────────────────────────
 @report_bp.route('/admin_report')
 def admin_report():
     if not session.get('logged_in'):
@@ -46,7 +50,10 @@ def admin_report():
 
     return render_template('admin_report.html', report_data=report_data)
 
-# ------------------------------------------------------------------
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Route: Weekly Summary CSV Export
+# ─────────────────────────────────────────────────────────────────────────────
 @report_bp.route('/admin_report_csv')
 def admin_report_csv():
     if not session.get('logged_in'):
@@ -73,8 +80,10 @@ def admin_report_csv():
 
     return csv_response(output, "weekly_report")
 
-# ------------------------------------------------------------------
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Route: Pass History Table and Export
+# ─────────────────────────────────────────────────────────────────────────────
 @report_bp.route('/admin_pass_history')
 def admin_pass_history():
     if not session.get('logged_in'):
@@ -84,6 +93,7 @@ def admin_pass_history():
         Pass.date.desc(), Pass.checkout_at.desc()
     ).limit(100).all()
 
+    # CSV Export
     if request.args.get("export") == "csv":
         output = StringIO()
         writer = csv.writer(output)
@@ -120,7 +130,7 @@ def admin_pass_history():
 
         return csv_response(output, "pass_history")
 
-    # HTML fallback
+    # HTML Fallback
     rows = []
     for p in passes:
         logs = sorted(p.events, key=lambda l: l.timestamp)

@@ -1,14 +1,24 @@
 # src/services/pass_manager.py
+# Core pass lifecycle management: creation, approval, rejection, return, and event logging
 
 from datetime import datetime
 from src.models import db, Pass, PassEvent
 from src.utils import log_audit
 
-STATUS_PENDING_START = "pending_start"
-STATUS_ACTIVE = "active"
+# ─────────────────────────────────────────────────────────────────────────────
+# Status Constants
+# ─────────────────────────────────────────────────────────────────────────────
+STATUS_PENDING_START  = "pending_start"
+STATUS_ACTIVE         = "active"
 STATUS_PENDING_RETURN = "pending_return"
-STATUS_RETURNED = "returned"
+STATUS_RETURNED       = "returned"
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Pass Lifecycle Operations
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Create a new pass for a student (override = immediate active pass).
 def create_pass(student_id, room, period, is_override=False):
     now = datetime.now()
     new_pass = Pass(
@@ -25,7 +35,7 @@ def create_pass(student_id, room, period, is_override=False):
     log_audit(student_id, f"Created pass {'(override)' if is_override else ''} for room {room}")
     return new_pass
 
-
+# Approve a pending pass and activate it.
 def approve_pass(pass_id):
     p = db.session.get(Pass, pass_id)
     if not p or p.status != STATUS_PENDING_START:
@@ -36,7 +46,7 @@ def approve_pass(pass_id):
     log_audit(p.student_id, f"Approved pass {pass_id}")
     return True
 
-
+# Reject a pending pass (deletes it).
 def reject_pass(pass_id):
     p = db.session.get(Pass, pass_id)
     if not p or p.status != STATUS_PENDING_START:
@@ -46,7 +56,7 @@ def reject_pass(pass_id):
     db.session.commit()
     return True
 
-
+# Mark a pass as returned and calculate duration.
 def return_pass(pass_obj, station=None):
     now = datetime.now()
     if pass_obj.checkin_at:
@@ -63,6 +73,11 @@ def return_pass(pass_obj, station=None):
     return True
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Event Logging (Swipe Events)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Record a swipe event (either "in" or "out") for a pass at a station.
 def record_pass_event(pass_obj, station, event_type):
     event = PassEvent(
         pass_id=pass_obj.id,

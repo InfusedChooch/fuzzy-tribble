@@ -10,6 +10,26 @@
   <a href="{{ url_for('admin.admin_view') }}">← Back to Admin Panel</a>
   <a href="{{ url_for('report.admin_report_csv') }}" style="float:right;">Download CSV</a>
 
+  <form method="get" style="margin-bottom: 20px;">
+  <label>Select Student:
+    <select name="student" onchange="this.form.submit()">
+      <option value="">-- All Students --</option>
+      {% for s in all_students %}
+        <option value="{{ s.id }}" {% if selected_student == s.id %}selected{% endif %}>{{ s.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label style="margin-left: 20px;">Filter by Room:
+    <select name="room" onchange="this.form.submit()">
+      <option value="">-- All Rooms --</option>
+      {% for r in all_rooms %}
+        <option value="{{ r }}" {% if selected_room == r %}selected{% endif %}>{{ r }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
   <table>
     <thead>
       <tr>

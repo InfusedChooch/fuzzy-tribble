@@ -2,7 +2,7 @@
 
 :root {
   --bg: #f9f9f9;
-  --text: #333;
+  --text: #000;
   --card-bg: white;
   --link: #2a5bd7;
   --link-hover: #1e40af;
@@ -15,7 +15,7 @@
 
 body.dark {
   --bg: #121212;
-  --text: #eee;
+  --text: #ffeb3b;
   --card-bg: #1f1f1f;
   --link: #9ecbff;
   --link-hover: #73ffd0;
@@ -24,29 +24,6 @@ body.dark {
   --border: #555;
   --error: #ff6b6b;
   --table-header: #2a2a2a;
-}
-
-body.dark nav {
-  background-color: #1e1e1e;
-}
-
-body.dark nav a {
-  color: var(--link);
-}
-
-body.dark nav a:hover {
-  color: var(--link-hover);
-}
-
-body.dark .custom-clock,
-body.dark .clock {
-  background-color: #222;
-  color: #ffdd57;
-  border-color: #ffdd57;
-}
-
-body.dark .pass-box {
-  border-color: #aaa;
 }
 
 /* ─── Base Layout ───────────────────────────────────────────── */
@@ -182,12 +159,12 @@ th {
   background: var(--card-bg);
 }
 
-.pass-box.free           { background-color: #dfffdf; }  /* Green */
-.pass-box.pending_start  { background-color: #cfe2ff; }  /* Blue */
-.pass-box.pending_return { background-color: #fff3cd; }  /* Yellow */
-.pass-box.active         { background-color: #ffd6d6; }  /* Red */
+.pass-box.free           { background-color: #dfffdf; }
+.pass-box.pending_start  { background-color: #cfe2ff; }
+.pass-box.pending_return { background-color: #fff3cd; }
+.pass-box.active         { background-color: #ffd6d6; }
 
-/* ─── Status Dots (used on student landing) ───────────────── */
+/* ─── Status Dots ──────────────────────────────────────────── */
 
 .dot {
   display: inline-block;
@@ -197,11 +174,15 @@ th {
   margin: 0 3px;
 }
 
-.dot.free    { background: #2ecc71; }  /* Green */
-.dot.pending { background: #3498db; }  /* Blue */
-.dot.taken   { background: #e74c3c; }  /* Red */
+.dot.free    { background: #2ecc71; }
+.dot.pending { background: #3498db; }
+.dot.taken   { background: #e74c3c; }
 
-/* ─── Symbols in pass boxes ───────────────────────────────── */
+body.dark .dot.free    { background: #81c784; }
+body.dark .dot.pending { background: #64b5f6; }
+body.dark .dot.taken   { background: #e57373; }
+
+/* ─── Symbols in Pass Boxes ───────────────────────────────── */
 
 .symbol {
   font-size: 2.2em;
@@ -212,7 +193,18 @@ th {
   font-weight: bold;
   font-size: 1em;
   margin-bottom: 0.4em;
+  color: var(--text);
 }
+
+/* ─── Colored Symbols ─────────────────────────────────────── */
+
+.circle.green { color: #2ecc71; }
+.circle.blue  { color: #3498db; }
+.circle.red   { color: #e74c3c; }
+
+body.dark .circle.green { color: #81c784; }
+body.dark .circle.blue  { color: #64b5f6; }
+body.dark .circle.red   { color: #e57373; }
 
 /* ─── Clock Banner ────────────────────────────────────────── */
 
@@ -244,4 +236,172 @@ th {
   border-radius: 5px;
   display: inline-block;
   margin: 5px 0;
+}
+
+/* ─── Nav Bar Styling ─────────────────────────────────────── */
+
+.main-nav {
+  background: var(--table-header);
+  padding: 10px 0;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  font-size: 1.1em;
+}
+
+.main-nav a {
+  color: var(--link);
+}
+
+.main-nav a:hover {
+  color: var(--link-hover);
+}
+
+body.dark .main-nav {
+  background-color: #1e1e1e;
+}
+
+body.dark .main-nav a {
+  color: #add8ff;
+}
+
+body.dark .main-nav a:hover {
+  color: #fff176;
+}
+
+/* ─── Headings in Dark Mode ───────────────────────────────── */
+
+body.dark h1,
+body.dark h2 {
+  color: #fff176;
+}
+
+/* ─── Dark Mode Table Contrast Fixes ───────────────────────── */
+
+body.dark .pass-box.free,
+body.dark .pass-box.pending_start,
+body.dark tr.pending_start td,
+body.dark tr.returned td,
+body.dark tr.active td,
+body.dark .recent-returns-table td {
+  color: #000 !important;
+}
+
+body.dark table,
+body.dark td,
+body.dark th {
+  color: var(--text);
+  background-color: var(--card-bg);
+}
+
+body.dark .pass-box:not(.free):not(.pending_start):not(.active) {
+  color: var(--text);
+}
+
+/* ─── Final Contrast Safety for Table Rows in Dark Mode ─────── */
+
+/* All tables default to yellow text in dark mode */
+body.dark table,
+body.dark th,
+body.dark td {
+  color: var(--text);
+  background-color: var(--card-bg);
+}
+
+/* Light-colored rows like blue/pink override to black text */
+body.dark tr.pending_start td,
+body.dark tr.active td,
+body.dark tr.returned td,
+body.dark .pass-box.free,
+body.dark .pass-box.pending_start,
+body.dark .recent-returns-table td {
+  color: #000 !important;
+}
+
+/* Ensure colored boxes not in light mode stay readable */
+body.dark .pass-box:not(.free):not(.pending_start):not(.active) {
+  color: var(--text);
+}
+
+/* ─── Adjust Pass Box Backgrounds in Dark Mode ───────────── */
+
+body.dark .pass-box.active {
+  background-color: #444 !important;  /* dark gray instead of red */
+  color: #fff;
+}
+
+body.dark .pass-box.pending_start {
+  background-color: #555 !important;  /* lighter gray instead of blue */
+  color: #fff;
+}
+
+body.dark .pass-box.free {
+  background-color: #445c44 !important;  /* Muted green-gray */
+  color: #fff;  /* Ensure good contrast */
+}
+
+/* ─── Admin Table Backgrounds in Dark Mode ─────────────────── */
+
+body.dark table {
+  background-color: #2a2a2a;  /* Lightened table base */
+}
+
+body.dark th {
+  background-color: #333;     /* Header cells slightly darker */
+  color: var(--text);
+}
+
+body.dark td {
+  background-color: #2a2a2a;  /* Light gray rows */
+  color: var(--text);
+}
+
+/* Keep light-colored rows readable with black text */
+body.dark tr.pending_start td,
+body.dark tr.active td,
+body.dark tr.returned td {
+  background-color: #eee !important;
+  color: #000 !important;
+}
+
+.passes-table {
+  margin: 1em auto;
+  border-collapse: collapse;
+  width: 90%;
+  max-width: 1000px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 1em;
+}
+
+.passes-table th,
+.passes-table td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: center;
+}
+
+.passes-table th {
+  background: var(--table-header);
+}
+
+/* Optional hover effect */
+.passes-table tbody tr:hover {
+  background-color: var(--btn-bg);
+  color: white;
+  cursor: default;
+}
+
+/* Dark mode overrides */
+body.dark .passes-table {
+  background: var(--card-bg);
+  color: var(--text);
+}
+
+body.dark .passes-table th {
+  background: var(--table-header);
+}
+
+body.dark .passes-table tbody tr:hover {
+  background-color: var(--btn-hover);
 }

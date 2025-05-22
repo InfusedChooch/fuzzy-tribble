@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
-"""
-Split masterlist.csv → users.csv + student_schedule.csv + teacher_schedule.csv
-
-• Default looks in /Seed
-• Falls back to local directory if needed
-"""
+# scripts/build_student_periods.py
+# Splits masterlist.csv into users.csv, student_schedule.csv, and teacher_schedule.csv.
 
 import csv, json, sys
 from pathlib import Path
 
+# ─── Setup Paths ─────────────────────────────────────────────────────────────
 ROOT        = Path(__file__).resolve().parents[1]
 SEED_DIR    = ROOT / "Seed"
 SCRIPT_DIR  = Path(__file__).resolve().parent
@@ -22,15 +19,15 @@ TEACHER_SCHED_CSV = SEED_DIR / "teacher_schedule.csv"
 
 PERIOD_LIST = ["0", "1", "2", "3", "4/5", "5/6", "6/7", "7/8", "9", "10", "11", "12"]
 
+# ─── Helpers ──────────────────────────────────────────────────────────────────
 def safe_field(p):
     return f"period_{p.replace('/', '_')}"
 
+# ─── Main Execution ──────────────────────────────────────────────────────────
 def main():
     masterlist = DEFAULT_ML if DEFAULT_ML.exists() else FALLBACK_ML
-
     if not masterlist.exists():
         sys.exit("❌ masterlist.csv not found in Seed or local directory.")
-
     print(f"📄 Using: {masterlist.relative_to(ROOT)}")
 
     with (
@@ -76,11 +73,8 @@ def main():
                     print(f"⚠️  Bad schedule JSON for {sid}; skipping")
                     sched = {}
 
-                out = [sid]
-                for p in PERIOD_LIST:
-                    out.append(sched.get(p, ""))
+                out = [sid] + [sched.get(p, "") for p in PERIOD_LIST]
                 w_stu.writerow(out)
-
             else:
                 w_tea.writerow([sid] + [""] * len(PERIOD_LIST))
 

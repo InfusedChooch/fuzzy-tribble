@@ -13,9 +13,12 @@
   </style>
 </head>
 <body>
-  <nav style="background: #e4e4e4; padding: 10px 0; display: flex; justify-content: center; gap: 20px; font-size: 1.1em;">
-  <a href="{{ url_for('core.student_landing') }}">🏠 Return to Dashboard</a>
-</nav>
+
+  <!-- ✅ Updated nav bar -->
+  <nav class="main-nav">
+    <a href="{{ url_for('core.student_landing') }}">🏠 Return to Dashboard</a>
+  </nav>
+
   <h1>{{ school_name }} - Room {{ room }}</h1>
   <h2 id="welcome-msg"></h2>
   <h2>Period: {{ current_period }}</h2>
@@ -32,8 +35,6 @@
             <span class="circle red">✕</span>
           {% endif %}
         </div>
-
-
         <div class="status-text">
           {% if p.student_name %}
             {{ p.student_name }}
@@ -63,44 +64,25 @@
     <p style="color: green;" class="message">{{ message }}</p>
   {% endif %}
 
-
   <script>
-  function refreshPassGrid() {
-    fetch(window.location.href)
-      .then(response => response.text())
-      .then(html => {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = html;
-        const newGrid = tempDiv.querySelector('#pass-grid');
-        const oldGrid = document.querySelector('#pass-grid');
-        oldGrid.innerHTML = newGrid.innerHTML;
-      });
-  }
-  setInterval(refreshPassGrid, 5000);
-</script>
+    function refreshPassGrid() {
+      fetch(window.location.href)
+        .then(response => response.text())
+        .then(html => {
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = html;
+          const newGrid = tempDiv.querySelector('#pass-grid');
+          const oldGrid = document.querySelector('#pass-grid');
+          oldGrid.innerHTML = newGrid.innerHTML;
+        });
+    }
+    setInterval(refreshPassGrid, 10000);
+  </script>
 
-<script>
-  window.userName = "{{ session.get('name') or 'User' }}";
-</script>
+  <script>window.userName = "{{ session.get('name') or 'User' }}";</script>
   <script>window.userRole = "{{ session.get('role') }}";</script>
   <script src="{{ url_for('static', filename='js/index.js') }}"></script>
-  <script> window.userName = "{{ session.get('name', 'User') }}"; </script>
   <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
-  <script>
-  function refreshPasses() {
-    fetch(window.location.href)
-      .then(response => response.text())
-      .then(html => {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = html;
-        const newGrid = tempDiv.querySelector('#pass-grid');
-        const oldGrid = document.querySelector('#pass-grid');
-        if (newGrid && oldGrid) oldGrid.innerHTML = newGrid.innerHTML;
-      });
-  }
-
-  setInterval(refreshPasses, 5000);
-</script>
 
 </body>
 </html>

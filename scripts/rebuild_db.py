@@ -1,10 +1,12 @@
 # scripts/rebuild_db.py
+# Rebuilds the database from CSV seed files; optionally loads logs and passes in full mode.
 
 import os, sys, shutil, csv
 from datetime import datetime, timedelta
 import pandas as pd
 from werkzeug.security import generate_password_hash
 
+# ─── Path Setup ─────────────────────────────────────────────────────────────
 ROOT_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT_DIR)
 
@@ -19,6 +21,7 @@ os.makedirs(PURGE_DIR, exist_ok=True)
 
 FULL_MODE = "--full" in sys.argv
 
+# ─── Archive Old Database ───────────────────────────────────────────────────
 def archive_existing_db():
     if not os.path.isfile(DB_FILE):
         print("ℹ️  No existing hallpass.db to archive.")
@@ -36,26 +39,28 @@ def archive_existing_db():
     shutil.move(DB_FILE, os.path.join(PURGE_DIR, f"{tag}_hallpass.db"))
     print(f"🗃️  Archived previous DB → purge/{tag}_hallpass.db")
 
+# ─── Helpers ────────────────────────────────────────────────────────────────
 def parse_dt(val):
     if pd.isna(val) or val == "":
         return None
     return pd.to_datetime(val, utc=True).to_pydatetime()
 
+# ─── Main Routine ───────────────────────────────────────────────────────────
 def rebuild_database():
     archive_existing_db()
-
     app = create_app()
+
     with app.app_context():
         db.drop_all()
         db.create_all()
         print("✅ Fresh database created.")
 
-        # ---------------- users ----------------
+        # Load Users
         try:
             df = pd.read_csv(os.path.join(SEED_DIR, "users.csv"))
             df.columns = [c.strip().lower() for c in df.columns]
-            required_fields = {"id", "name", "email", "role", "password"}
-            if missing := (required_fields - set(df.columns)):
+            required = {"id", "name", "email", "role", "password"}
+            if missing := (required - set(df.columns)):
                 raise ValueError(f"Missing columns in users.csv: {missing}")
             df["password"] = df["password"].apply(lambda raw: generate_password_hash(str(raw)))
             db.session.bulk_insert_mappings(User, df.to_dict("records"))
@@ -63,23 +68,19 @@ def rebuild_database():
         except Exception as e:
             print(f"⚠️  users.csv load error: {e}")
 
-        # ---------------- student_schedule ----------------
-        try:
-            df = pd.read_csv(os.path.join(SEED_DIR, "student_schedule.csv"))
-            db.session.bulk_insert_mappings(StudentSchedule, df.to_dict("records"))
-            print(f"✅ Loaded {len(df)} student schedules.")
-        except Exception as e:
-            print(f"⚠️  student_schedule.csv load error: {e}")
+        # Load Schedules
+        for fname, model, label in [
+            ("student_schedule.csv", StudentSchedule, "student schedules"),
+            ("teacher_schedule.csv", TeacherSchedule, "teacher schedules")
+        ]:
+            try:
+                df = pd.read_csv(os.path.join(SEED_DIR, fname))
+                db.session.bulk_insert_mappings(model, df.to_dict("records"))
+                print(f"✅ Loaded {len(df)} {label}.")
+            except Exception as e:
+                print(f"⚠️  {fname} load error: {e}")
 
-        # ---------------- teacher_schedule ----------------
-        try:
-            df = pd.read_csv(os.path.join(SEED_DIR, "teacher_schedule.csv"))
-            db.session.bulk_insert_mappings(TeacherSchedule, df.to_dict("records"))
-            print(f"✅ Loaded {len(df)} teacher schedules.")
-        except Exception as e:
-            print(f"⚠️  teacher_schedule.csv load error: {e}")
-
-        # ---------------- generate student_periods from student_schedule ----------------
+        # Derive StudentPeriod from StudentSchedule
         try:
             all_scheds = StudentSchedule.query.all()
             count = 0
@@ -95,40 +96,25 @@ def rebuild_database():
             print(f"⚠️  Error generating student_periods: {e}")
 
         if FULL_MODE:
-            # ---------------- passes ------------------ 
-            try:
-                df = pd.read_csv(os.path.join(SEED_DIR, "passes.csv"))
-                df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.date
-                df["checkout_at"] = df["checkout_at"].apply(parse_dt)
-                df["checkin_at"]  = df["checkin_at"].apply(parse_dt)
-                db.session.bulk_insert_mappings(Pass, df.to_dict("records"))
-                print(f"✅ Loaded {len(df)} passes.")
-            except FileNotFoundError:
-                print("ℹ️  passes.csv not found – skipping.")
-            except Exception as e:
-                print(f"⚠️  passes.csv load error: {e}")
-
-            # ------------- pass events ---------------- 
-            try:
-                df = pd.read_csv(os.path.join(SEED_DIR, "pass_events.csv"))
-                df["timestamp"] = df["timestamp"].apply(parse_dt)
-                db.session.bulk_insert_mappings(PassEvent, df.to_dict("records"))
-                print(f"✅ Loaded {len(df)} pass events.")
-            except FileNotFoundError:
-                print("ℹ️  pass_events.csv not found – skipping.")
-            except Exception as e:
-                print(f"⚠️  pass_events.csv load error: {e}")
-
-            # -------------- audit log ----------------- 
-            try:
-                df = pd.read_csv(os.path.join(SEED_DIR, "audit_log.csv"))
-                df["time"] = df["time"].apply(parse_dt)
-                db.session.bulk_insert_mappings(AuditLog, df.to_dict("records"))
-                print(f"✅ Loaded {len(df)} audit entries.")
-            except FileNotFoundError:
-                print("ℹ️  audit_log.csv not found – skipping.")
-            except Exception as e:
-                print(f"⚠️  audit_log.csv load error: {e}")
+            # Optional: Load pass records and logs
+            for fname, model, parse_map, label in [
+                ("passes.csv", Pass, {"date": "date", "checkout_at": "datetime", "checkin_at": "datetime"}, "passes"),
+                ("pass_events.csv", PassEvent, {"timestamp": "datetime"}, "pass events"),
+                ("audit_log.csv", AuditLog, {"time": "datetime"}, "audit entries")
+            ]:
+                try:
+                    df = pd.read_csv(os.path.join(SEED_DIR, fname))
+                    for col, ptype in parse_map.items():
+                        if ptype == "date":
+                            df[col] = pd.to_datetime(df[col], errors="coerce").dt.date
+                        else:
+                            df[col] = df[col].apply(parse_dt)
+                    db.session.bulk_insert_mappings(model, df.to_dict("records"))
+                    print(f"✅ Loaded {len(df)} {label}.")
+                except FileNotFoundError:
+                    print(f"ℹ️  {fname} not found – skipping.")
+                except Exception as e:
+                    print(f"⚠️  {fname} load error: {e}")
         else:
             print("🧹 Clean rebuild — skipped passes, events, audit logs.")
 

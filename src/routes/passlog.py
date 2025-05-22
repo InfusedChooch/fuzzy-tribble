@@ -1,4 +1,5 @@
 # src/routes/passlog.py
+# Handles station kiosk logic: check-in/out flow, swipe validation, and shutdown
 
 from flask import Blueprint, request, session, jsonify, render_template, redirect, url_for
 from datetime import datetime
@@ -21,7 +22,10 @@ STATUS_RETURNED       = pass_manager.STATUS_RETURNED
 HEARTBEAT_FILE = os.path.join('data', 'station_heartbeat.json')
 config = load_config()
 
-# ------------------------------------------------------------------
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Route: Station Console View (Student swipes)
+# ─────────────────────────────────────────────────────────────────────────────
 @passlog_bp.route('/station_console', methods=['GET', 'POST'])
 def station_console():
     if 'station_id' not in session:
@@ -55,6 +59,7 @@ def station_console():
                     last_event = db.session.query(PassEvent).filter_by(pass_id=active_pass.id)\
                         .order_by(PassEvent.timestamp.desc()).first()
 
+                    # Prevent double-swipe abuse
                     if (
                         last_event and
                         last_event.station == station and
@@ -64,7 +69,7 @@ def station_console():
                     ):
                         message = "Already swiped out - wait a moment before re-entering."
                     else:
-                        # ✅ Only set room_in if it's a real station, not a classroom
+                        # Set return room if valid station (not classroom)
                         if (
                             new_event == "in" and
                             not active_pass.room_in and
@@ -76,12 +81,12 @@ def station_console():
 
                         pass_manager.record_pass_event(active_pass, station, new_event)
 
-                        # 🛠️ Clear room_in if swiping out of a real return station
+                        # Clear return room if exiting it
                         if new_event == "out" and active_pass.room_in == station:
                             active_pass.room_in = None
                             db.session.commit()
 
-                        # ✅ Return to origin room, regardless of prior OUT logs
+                        # Check-in back to origin
                         if new_event == "in" and station == active_pass.origin_room:
                             if not active_pass.room_in:
                                 active_pass.room_in = station
@@ -92,7 +97,7 @@ def station_console():
                             db.session.commit()
                             message = f"{student.name} {new_event} recorded at {station}."
             else:
-                # 🟢 Self-checkout logic for classrooms
+                # Self-checkout logic for classrooms
                 if not is_station(station):
                     max_passes = config.get("passes_available", 2)
                     active_count = Pass.query.filter(
@@ -121,7 +126,11 @@ def station_console():
                     message = "You don’t have an active pass to use this station."
 
     return render_template('station.html', station=station, passes=[], message=message)
-# ------------------------------------------------------------------
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Route: Shutdown Station Kiosk
+# ─────────────────────────────────────────────────────────────────────────────
 @passlog_bp.route('/close_station', methods=['POST'])
 def close_station():
     if 'station_id' not in session:
@@ -139,7 +148,10 @@ def close_station():
     session.pop('station_id', None)
     return redirect(url_for('auth.login'))
 
-# ------------------------------------------------------------------
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Route: Launch Popout View for Specific Station
+# ─────────────────────────────────────────────────────────────────────────────
 @passlog_bp.route('/station_view/<station_name>')
 def popout_station_view(station_name):
     session['station_id'] = station_name

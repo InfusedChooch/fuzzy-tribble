@@ -1,6 +1,6 @@
 # README.md — Updated 2025-05-21
 
-## 🧾 Overview
+## 📜 Overview
 
 TJMS Hall Pass Tracker is a student check-in/out web application for managing hallway usage. Built using Flask, SQLite, and JS/HTML/CSS, it supports Admin, Teacher, and Student logins, station swiping, and visual dashboards.
 
@@ -113,33 +113,81 @@ wsgi.py
 
 ---
 
-# Worklog.md — 2025-05-21
+## 📄 Refactor Summary — May 2025 Cleanup
 
-## ✅ Things Working
+All major backend files under `src/routes/`, `src/utils.py`, `src/models.py`, and `src/services/` were cleaned and standardized:
 
-* Room toggling and visualization (color dots)
-* Pop-up for password change (students + teachers)
-* CSV export from launcher working (to `data/logs`)
-* GUI tail for audit log confirmed working
-* Dark mode toggle with moon button
-* All pass lifecycles tested: start, swipe, return
-* Launcher GUI has working config editor + route preview
+* 🧹 Replaced all `"""docstrings"""` with `#` comments for consistency
+* 🧩 Grouped code by logical sections with `# ──` dividers
+* 📌 Added file-path + purpose comment at the top of each file
+* 🔧 Reordered functions for clarity and consistency
+* 🗃️ Improved inline comments and removed unused imports
+* 🔐 Ensured session, role, and ID checks are clearly marked
+* 📤 CSV export functions moved to use `csv_response()` helper
 
-## 🔍 Needs Review
+Refactored files:
 
-* Ensure all timestamps are stored UTC or converted cleanly
-* Confirm station slot config values are being pulled properly from `config.json`
-* Double-check that dark mode overrides text contrast in all templates (e.g., `landing.html` vs. `admin.html`)
+* `scripts/build_student_periods.py`
+* `scripts/rebuild_db.py`
+* `src/utils.py`
+* `src/models.py`
+* `src/services/pass_manager.py`
+* `src/routes/admin.py`
+* `src/routes/auth.py`
+* `src/routes/core.py`
+* `src/routes/passlog.py`
+* `src/routes/report.py`
+* `src/routes/students.py`
 
-## 🛠️ Broken or Needs Fixing
+🎨 Updated Frontend & Styling (May 2025)
+✅ JavaScript Changes
+admin.js
+✅ Split logic into well-labeled sections: Init, Pass Actions, Popups, and Station Tools
 
-* None observed today
+✅ Added greeting message (Welcome X or Good morning X)
 
-## 🔜 Next Steps
+✅ Added preloadAndOpenSchedule() call for teachers needing schedule setup
 
-* Add support for comments or notes per room (e.g., "Bathroom closed")
-* Add student photo/ID card optional field (or scan QR)
-* Enable per-student pass limits (daily/weekly)
-* Improve teacher override interface with dropdowns
-* Investigate SQLite concurrency limits for high volume swipes
-* Auto-clear stale open passes via cron or periodic audit
+✅ Modular pass row rendering and time tracking (updateTimers)
+
+✅ Improved popup positioning and style consistency
+
+✅ Refactored teacher popup to include period mapping
+
+index.js
+✅ Student landing page JS extracted to its own file
+
+✅ Draws current room status visually using colored dots
+
+✅ Displays current period and synced clock
+
+✅ Supports inline password update via modal popup
+
+rooms.js
+✅ Dynamically fetches room list and statuses
+
+✅ Admin UI includes color-coded dots: 🟥 taken, 🟦 pending, 🟩 free
+
+✅ Room actions available: rename, reset, stats, delete
+
+✅ closeAllRooms() utility added
+
+theme.js
+✅ Supports persistent dark mode with localStorage
+
+✅ Conditionally shows ⚙️ Settings button for teacher/admin
+
+✅ Adds compact floating button UI (🌓 + ⚙️)
+
+🎨 CSS (style.css) Enhancements
+✅ Full support for light/dark theme via :root + .dark variables
+
+✅ Improved form and table accessibility
+
+✅ Dot indicators styled for pass slots and room status
+
+✅ Button and input hover feedback harmonized
+
+✅ Visual consistency across all modals, popups, and tables
+
+✅ Styled .custom-clock for prominent time display
