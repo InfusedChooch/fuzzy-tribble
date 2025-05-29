@@ -108,3 +108,7 @@
 [AUDIT] admin - Admin admin logged in successfully
 [AUDIT] admin - Admin logout
 [AUDIT] 600 - Student logout
+[AUDIT] admin - Failed admin login by Admin
+[AUDIT] admin - Admin Admin logged in successfully
+[AUDIT] admin - Activated room 115
+[AUDIT] admin - Deactivated room 115
