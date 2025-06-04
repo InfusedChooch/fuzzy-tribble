@@ -275,9 +275,8 @@ function preloadAndOpenSchedule() {
     .catch(() => openSchedulePopup({}));
 }
 
-console.log("🧪 openSchedulePopup received:", existing);
-
 function openSchedulePopup(existing = {}) {
+  console.log("🧪 openSchedulePopup received:", existing);
   const popup = document.createElement('div');
   popup.style.position = 'fixed';
   popup.style.top = '10%';
