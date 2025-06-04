@@ -22,7 +22,7 @@ THRESHOLDS = config.get("report_time_thresholds", {"over_5": 300, "over_10": 600
 @report_bp.route('/admin_report')
 def admin_report():
     if not session.get('logged_in'):
-        return redirect(url_for('auth.admin_login'))
+        return redirect(url_for('auth.login'))
 
     report_data = []
 
@@ -57,7 +57,7 @@ def admin_report():
 @report_bp.route('/admin_report_csv')
 def admin_report_csv():
     if not session.get('logged_in'):
-        return redirect(url_for('auth.admin_login'))
+        return redirect(url_for('auth.login'))
 
     output = StringIO()
     writer = csv.writer(output)
@@ -87,7 +87,7 @@ def admin_report_csv():
 @report_bp.route('/admin_pass_history')
 def admin_pass_history():
     if not session.get('logged_in'):
-        return redirect(url_for('auth.admin_login'))
+        return redirect(url_for('auth.login'))
 
     passes = Pass.query.filter(Pass.checkin_at != None).order_by(
         Pass.date.desc(), Pass.checkout_at.desc()
