@@ -1,7 +1,7 @@
 """
 Application factory + table-exist check
 ──────────────────────────────────────
-• Uses the newer schema (students, student_periods, passes, pass_events, audit_log)
+• Uses the newer schema (users, student_periods, passes, pass_events, audit_log)
 • Registers every blueprint that was previously in src/__init__.py
 • Only creates the tables if one of the required ones is missing
 """
@@ -53,7 +53,7 @@ def create_app() -> Flask:
         inspector = inspect(db.engine)
         existing  = set(inspector.get_table_names())
         required  = {
-            "students",
+            "users",
             "student_periods",
             "passes",
             "pass_events",
