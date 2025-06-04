@@ -18,7 +18,7 @@ config = load_config()
 @students_bp.route('/students')
 def manage_students():
     if not session.get('logged_in'):
-        return redirect(url_for('auth.admin_login'))
+        return redirect(url_for('auth.login'))
 
     students = User.query.filter_by(role="student").all()
     return render_template('students.html', students=students)
@@ -30,7 +30,7 @@ def manage_students():
 @students_bp.route('/students/download')
 def download_students_csv():
     if not session.get('logged_in'):
-        return redirect(url_for('auth.admin_login'))
+        return redirect(url_for('auth.login'))
 
     from src.models import StudentSchedule
 
@@ -65,7 +65,7 @@ def download_students_csv():
 @students_bp.route('/students/upload', methods=['POST'])
 def upload_students_csv():
     if not session.get('logged_in') or session.get('role') != "admin":
-        return redirect(url_for('auth.admin_login'))
+        return redirect(url_for('auth.login'))
 
     file = request.files.get('csv_file')
     if not file:
@@ -127,7 +127,7 @@ def upload_students_csv():
 @students_bp.route('/students/add', methods=['POST'])
 def add_student():
     if not session.get('logged_in'):
-        return redirect(url_for('auth.admin_login'))
+        return redirect(url_for('auth.login'))
 
     student_id = request.form.get('id').strip()
     name = request.form.get('name').strip()
