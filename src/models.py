@@ -181,3 +181,4 @@ class AuditLog(db.Model):
     student_id = db.Column(db.String, db.ForeignKey("users.id"))
     time       = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
     reason     = db.Column(db.String(255), nullable=False)
+

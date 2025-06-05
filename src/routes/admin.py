@@ -628,3 +628,4 @@ def get_teacher_schedule():
         for attr in inspect(sched).mapper.column_attrs
         if attr.key.startswith("period_")
     })
+

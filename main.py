@@ -25,3 +25,4 @@ if __name__ == "__main__":
         debug=debug_enabled,
         use_reloader=False,   # ← keeps a single process the GUI can stop
     )
+

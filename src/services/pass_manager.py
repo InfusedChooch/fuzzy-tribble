@@ -88,3 +88,4 @@ def record_pass_event(pass_obj, station, event_type):
     db.session.add(event)
     db.session.commit()
     log_audit(pass_obj.student_id, f"{event_type.upper()} at {station}")
+

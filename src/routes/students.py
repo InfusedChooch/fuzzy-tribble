@@ -157,3 +157,4 @@ def add_student():
 
     except Exception as e:
         return f"Add failed: {str(e)}", 500
+

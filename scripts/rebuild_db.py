@@ -123,3 +123,4 @@ def rebuild_database():
 
 if __name__ == "__main__":
     rebuild_database()
+

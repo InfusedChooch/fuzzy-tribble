@@ -60,10 +60,8 @@ This file serves as a living changelog and task board for ongoing development, t
 
 
 ### File Index
-file_paths.md
-launcher.py
+launcher.py (CustomTkinter)
 LICENSE
-list_files.py
 main.py
 README.md
 requirements.txt
