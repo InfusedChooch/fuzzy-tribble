@@ -158,3 +158,4 @@ def admin_pass_history():
         })
 
     return render_template("admin_pass_history.html", rows=rows)
+

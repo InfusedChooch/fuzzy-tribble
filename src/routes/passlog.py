@@ -156,3 +156,4 @@ def close_station():
 def popout_station_view(station_name):
     session['station_id'] = station_name
     return redirect(url_for('passlog.station_console'))
+
